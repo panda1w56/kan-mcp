@@ -359,9 +359,17 @@ tests/
 
 ## Release / Publishing
 
-Publishing to npm is handled automatically by the GitHub Actions workflow in
-`.github/workflows/publish.yml`. It triggers on version tags (`v*`) or manual
-dispatch, runs `npm test` and `npm run build`, then runs `npm publish`.
+Releases are created automatically by the GitHub Actions workflow in
+`.github/workflows/publish.yml`. On every push to `main` (or manual dispatch),
+the workflow:
+
+1. Reads the version from `package.json`.
+2. Skips if a tag `v<version>` already exists (i.e. the version was already
+   published).
+3. Runs `npm test` and `npm run build`.
+4. Publishes the package to npm.
+5. Creates a git tag `v<version>` and a GitHub Release with auto-generated
+   release notes.
 
 ### Requirements
 
@@ -370,25 +378,24 @@ dispatch, runs `npm test` and `npm run build`, then runs `npm publish`.
   **read & write** on the `kanbn-mcp` package and **Bypass 2FA** enabled.
 - The package is published as `kanbn-mcp` (unscoped, public).
 
-### How to publish a new version
+### How to release a new version
 
-1. Bump the version in `package.json` (e.g. `0.1.7` → `0.1.8`).
-2. Commit the change:
+1. Bump the version in `package.json` (and `package-lock.json`):
+   ```bash
+   npm version 0.1.9 --no-git-tag-version
+   ```
+2. Commit and push to `main`:
    ```bash
    git add package.json package-lock.json
-   git commit -m "Bump version to 0.1.8"
+   git commit -m "Bump version to 0.1.9"
+   git push origin main
    ```
-3. Tag the release and push:
-   ```bash
-   git tag v0.1.8
-   git push origin main --tags
-   ```
-4. The workflow runs tests, builds, and publishes automatically.
+3. The workflow detects the new version, publishes to npm, and creates the
+   tag + GitHub Release with notes automatically.
 
-To publish manually without a tag, trigger the workflow from the Actions tab
+To trigger a release manually without a version bump, use the Actions tab
 (Workflow dispatch).
 
----
 
 ## Future Improvements
 
