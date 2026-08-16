@@ -146,9 +146,9 @@ describe('label tools', () => {
   });
 
   describe('label.update', () => {
-    test('updates a label name', async () => {
+    test('updates a label', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const input = { publicId: 'label-1', name: 'Updated Label' };
+      const input = { publicId: 'label-1', name: 'Updated Label', colourCode: '#FF5733' };
       const updatedLabel = { ...mockLabel, name: 'Updated Label' };
 
       let receivedUrl = '';
@@ -167,68 +167,45 @@ describe('label tools', () => {
 
       const result = await labelUpdateTool.handler(client, input);
 
-      expect(receivedMethod).toBe('PATCH');
+      expect(receivedMethod).toBe('PUT');
       expect(receivedUrl).toContain('/labels/label-1');
-      expect(JSON.parse(receivedBody)).toEqual({ name: 'Updated Label' });
+      expect(JSON.parse(receivedBody)).toEqual({ name: 'Updated Label', colourCode: '#FF5733' });
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.name).toBe('Updated Label');
       }
     });
 
-    test('updates label colourCode', async () => {
-      const client = new KanClient(TEST_API_KEY);
-      const input = { publicId: 'label-1', colourCode: '#00FF00' };
-      const updatedLabel = { ...mockLabel, colourCode: '#00FF00' };
-
-      let receivedBody = '';
-
-      globalThis.fetch = async (url, init) => {
-        receivedBody = init?.body as string;
-        return new Response(JSON.stringify(updatedLabel), {
-          status: 200,
-          ok: true,
-        }) as Response;
-      };
-
-      const result = await labelUpdateTool.handler(client, input);
-
-      expect(JSON.parse(receivedBody)).toEqual({ colourCode: '#00FF00' });
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.data.colourCode).toBe('#00FF00');
-      }
-    });
-
-    test('updates multiple fields at once', async () => {
-      const client = new KanClient(TEST_API_KEY);
-      const input = { publicId: 'label-1', name: 'New Name', colourCode: '#0000FF' };
-      const updatedLabel = { ...mockLabel, name: 'New Name', colourCode: '#0000FF' };
-
-      let receivedBody = '';
-
-      globalThis.fetch = async (url, init) => {
-        receivedBody = init?.body as string;
-        return new Response(JSON.stringify(updatedLabel), {
-          status: 200,
-          ok: true,
-        }) as Response;
-      };
-
-      const result = await labelUpdateTool.handler(client, input);
-
-      expect(JSON.parse(receivedBody)).toEqual({ name: 'New Name', colourCode: '#0000FF' });
-      expect(result.ok).toBe(true);
-    });
-
     test('returns error when publicId is missing', async () => {
       const client = new KanClient(TEST_API_KEY);
 
-      const result = await labelUpdateTool.handler(client, { name: 'Test' } as any);
+      const result = await labelUpdateTool.handler(client, { name: 'Test', colourCode: '#FF5733' } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error).toContain('publicId');
+      }
+    });
+
+    test('returns error when name is missing', async () => {
+      const client = new KanClient(TEST_API_KEY);
+
+      const result = await labelUpdateTool.handler(client, { publicId: 'label-1', colourCode: '#FF5733' } as any);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('name');
+      }
+    });
+
+    test('returns error when colourCode is missing', async () => {
+      const client = new KanClient(TEST_API_KEY);
+
+      const result = await labelUpdateTool.handler(client, { publicId: 'label-1', name: 'Test' } as any);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('colourCode');
       }
     });
   });

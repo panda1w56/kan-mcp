@@ -106,27 +106,35 @@ Add this to your agent/IDE's MCP server configuration:
 ```
 workspace.list                    # List all workspaces
 workspace.findByName              # Find workspace by name (case-insensitive)
-workspace.create                  # Create a new workspace
+workspace.create                  # Create a new workspace (slug optional, auto-generated)
 workspace.getById                 # Get workspace by ID
 workspace.getBySlug               # Get workspace by slug
-workspace.update                  # Update workspace properties
+workspace.update                  # Update workspace properties (weekStartDay: 0, 1, or 6)
 workspace.delete                  # Delete a workspace
-workspace.search                  # Search boards and cards
+workspace.search                  # Search boards and cards (requires workspacePublicId)
 workspace.checkSlugAvailability   # Check if slug is available
 ```
 
 #### Board Tools
 
 ```
-board.list                       # List boards (with filters)
-board.create                     # Create a new board
+board.list                       # List boards in a workspace (requires workspacePublicId)
+board.create                     # Create a new board (slug auto-generated from name)
 board.getById                    # Get board by ID (with card filters)
-board.getBySlug                  # Get board by slug (with card filters)
+board.getBySlug                  # Get board by workspace slug + board slug (with card filters)
 board.findByName                 # Find board by workspace + board name
-board.update                     # Update board properties
+board.update                     # Update board properties (name, slug, visibility, favorite, archived)
 board.delete                     # Delete a board
-board.checkSlugAvailability      # Check if slug is available
+board.checkSlugAvailability      # Check if a slug is available (requires an existing boardPublicId)
 ```
+
+> **Note:** The Kan.bn API nests board collection endpoints under a workspace.
+> `board.list` and `board.create` require a `workspacePublicId`. `board.getBySlug`
+> takes a `workspaceSlug` and `boardSlug`. `board.checkSlugAvailability` requires
+> the `boardPublicId` of an existing board in the target workspace (used to resolve
+> the workspace) plus the `boardSlug` to check. When creating a board, the slug is
+> auto-generated from the name; you can optionally pass initial `lists` and `labels`
+> (arrays of names) or a `sourceBoardPublicId` to clone an existing board.
 
 ##### Board Filtering
 `board.getById` and `board.getBySlug` support filtering cards within the board:
@@ -137,7 +145,7 @@ board.checkSlugAvailability      # Check if slug is available
 | `labels` | Filter cards by label IDs |
 | `lists` | Filter cards by list IDs |
 | `dueDateFilters` | Filter by due date status: `overdue`, `today`, `tomorrow`, `next-week`, `next-month`, `no-due-date` |
-| `type` | Filter by board type: `regular`, `template` |
+| `type` | Filter by board type: `regular`, `template` (board.list and board.getById only) |
 
 #### List Tools
 
@@ -152,22 +160,28 @@ list.delete                      # Delete a list
 ```
 card.create                      # Create a new card
 card.getById                     # Get card by ID
-card.duplicate                   # Duplicate a card to same or different list
+card.duplicate                   # Duplicate a card to a target list (requires targetListPublicId)
 card.update                      # Update card properties
 card.delete                      # Delete a card
-card.addLabel                    # Add label to card
-card.removeLabel                 # Remove label from card
-card.addMember                   # Add member to card
-card.removeMember                # Remove member from card
+card.addLabel                    # Add label to card (idempotent)
+card.removeLabel                 # Remove label from card (idempotent)
+card.addMember                   # Add member to card (idempotent)
+card.removeMember                # Remove member from card (idempotent)
 card.listActivities              # List card activities (with cursor pagination)
 ```
+
+> **Note:** The Kan.bn API exposes label/member attachment as a single PUT toggle,
+> so `card.addLabel`/`card.removeLabel` and `card.addMember`/`card.removeMember`
+> first check the card's current attachments and only call the toggle when needed,
+> keeping them idempotent. `card.duplicate` requires `targetListPublicId` and
+> accepts `copyLabels`, `copyMembers`, `copyChecklists` (all default to `true`).
 
 #### Label Tools
 
 ```
 label.create                     # Create a new label
 label.getById                    # Get label by ID
-label.update                     # Update label properties
+label.update                     # Update a label (name and colourCode required)
 label.delete                     # Delete a label
 ```
 
@@ -258,8 +272,8 @@ Output: { "publicId": "ws_xxx", "name": "Project Alpha", "slug": "project-alpha"
 AI: Now create a board called "Sprint 1" in that workspace
 
 Tool: board.create
-Input: { "workspacePublicId": "ws_xxx", "name": "Sprint 1", "slug": "sprint-1", "visibility": "private" }
-Output: { "publicId": "brd_xxx", "name": "Sprint 1", ... }
+Input: { "workspacePublicId": "ws_xxx", "name": "Sprint 1", "lists": ["To Do", "In Progress", "Done"], "labels": ["bug", "feature"] }
+Output: { "publicId": "brd_xxx", "name": "Sprint 1" }
 ```
 
 #### Manage cards with labels and checklists
@@ -286,14 +300,14 @@ Input: { "checklistPublicId": "chk_xxx", "title": "Write auth middleware" }
 #### Search and update
 
 ```
-AI: Find all cards with "login" in the title and update their priority to high
+AI: Find all cards with "login" in the title in the Project Alpha workspace
 
 Tool: workspace.search
-Input: { "query": "login" }
+Input: { "workspacePublicId": "ws_xxx", "query": "login" }
 Output: { "boards": [...], "cards": [{ "publicId": "card_xxx", "title": "Implement login", ... }] }
 
 Tool: card.update
-Input: { "publicId": "card_xxx", "priority": "high" }
+Input: { "publicId": "card_xxx", "title": "Implement login (v2)" }
 ```
 
 ### Test Coverage
@@ -454,27 +468,35 @@ Añade esto a la configuración del servidor MCP de tu agente/IDE:
 ```
 workspace.list                    # Listar todos los workspaces
 workspace.findByName              # Buscar workspace por nombre (sin distinguir mayúsculas)
-workspace.create                  # Crear un nuevo workspace
+workspace.create                  # Crear un nuevo workspace (slug opcional, auto-generado)
 workspace.getById                 # Obtener workspace por ID
 workspace.getBySlug               # Obtener workspace por slug
-workspace.update                  # Actualizar propiedades del workspace
+workspace.update                  # Actualizar propiedades del workspace (weekStartDay: 0, 1 o 6)
 workspace.delete                  # Eliminar un workspace
-workspace.search                  # Buscar boards y cards
+workspace.search                  # Buscar boards y cards (requiere workspacePublicId)
 workspace.checkSlugAvailability   # Comprobar si un slug está disponible
 ```
 
 #### Herramientas de Board
 
 ```
-board.list                       # Listar boards (con filtros)
-board.create                     # Crear un nuevo board
+board.list                       # Listar boards de un workspace (requiere workspacePublicId)
+board.create                     # Crear un nuevo board (slug auto-generado desde el nombre)
 board.getById                    # Obtener board por ID (con filtros de cards)
-board.getBySlug                  # Obtener board por slug (con filtros de cards)
+board.getBySlug                  # Obtener board por slug de workspace + slug de board (con filtros de cards)
 board.findByName                 # Buscar board por workspace + nombre del board
-board.update                     # Actualizar propiedades del board
+board.update                     # Actualizar propiedades del board (name, slug, visibility, favorite, archived)
 board.delete                     # Eliminar un board
-board.checkSlugAvailability      # Comprobar si un slug está disponible
+board.checkSlugAvailability      # Comprobar si un slug está disponible (requiere un boardPublicId existente)
 ```
+
+> **Nota:** La API de Kan.bn anida los endpoints de colección de boards bajo un workspace.
+> `board.list` y `board.create` requieren un `workspacePublicId`. `board.getBySlug`
+> recibe un `workspaceSlug` y un `boardSlug`. `board.checkSlugAvailability` requiere
+> el `boardPublicId` de un board existente en el workspace de destino (usado para resolver
+> el workspace) más el `boardSlug` a comprobar. Al crear un board, el slug se
+> auto-genera a partir del nombre; opcionalmente puedes pasar `lists` y `labels` iniciales
+> (arrays de nombres) o un `sourceBoardPublicId` para clonar un board existente.
 
 ##### Filtrado de Boards
 `board.getById` y `board.getBySlug` permiten filtrar las cards dentro del board:
@@ -485,7 +507,7 @@ board.checkSlugAvailability      # Comprobar si un slug está disponible
 | `labels` | Filtrar cards por IDs de labels |
 | `lists` | Filtrar cards por IDs de listas |
 | `dueDateFilters` | Filtrar por estado de fecha de vencimiento: `overdue`, `today`, `tomorrow`, `next-week`, `next-month`, `no-due-date` |
-| `type` | Filtrar por tipo de board: `regular`, `template` |
+| `type` | Filtrar por tipo de board: `regular`, `template` (solo board.list y board.getById) |
 
 #### Herramientas de Lista
 
@@ -500,22 +522,29 @@ list.delete                      # Eliminar una lista
 ```
 card.create                      # Crear una nueva card
 card.getById                     # Obtener card por ID
-card.duplicate                   # Duplicar una card a la misma u otra lista
+card.duplicate                   # Duplicar una card a una lista destino (requiere targetListPublicId)
 card.update                      # Actualizar propiedades de la card
 card.delete                      # Eliminar una card
-card.addLabel                    # Añadir label a la card
-card.removeLabel                 # Quitar label de la card
-card.addMember                   # Añadir miembro a la card
-card.removeMember                # Quitar miembro de la card
+card.addLabel                    # Añadir label a la card (idempotente)
+card.removeLabel                 # Quitar label de la card (idempotente)
+card.addMember                   # Añadir miembro a la card (idempotente)
+card.removeMember                # Quitar miembro de la card (idempotente)
 card.listActivities              # Listar actividades de la card (con paginación por cursor)
 ```
+
+> **Nota:** La API de Kan.bn expone la asignación de labels/miembros como un único
+> toggle PUT, por lo que `card.addLabel`/`card.removeLabel` y
+> `card.addMember`/`card.removeMember` primero comprueban los adjuntos actuales de
+> la card y solo invocan el toggle cuando es necesario, manteniéndolos idempotentes.
+> `card.duplicate` requiere `targetListPublicId` y acepta `copyLabels`,
+> `copyMembers`, `copyChecklists` (todos por defecto `true`).
 
 #### Herramientas de Label
 
 ```
 label.create                     # Crear un nuevo label
 label.getById                    # Obtener label por ID
-label.update                     # Actualizar propiedades del label
+label.update                     # Actualizar un label (name y colourCode requeridos)
 label.delete                     # Eliminar un label
 ```
 
@@ -606,8 +635,8 @@ Output: { "publicId": "ws_xxx", "name": "Project Alpha", "slug": "project-alpha"
 AI: Ahora crea un board llamado "Sprint 1" en ese workspace
 
 Tool: board.create
-Input: { "workspacePublicId": "ws_xxx", "name": "Sprint 1", "slug": "sprint-1", "visibility": "private" }
-Output: { "publicId": "brd_xxx", "name": "Sprint 1", ... }
+Input: { "workspacePublicId": "ws_xxx", "name": "Sprint 1", "lists": ["To Do", "In Progress", "Done"], "labels": ["bug", "feature"] }
+Output: { "publicId": "brd_xxx", "name": "Sprint 1" }
 ```
 
 #### Gestionar cards con labels y checklists
@@ -634,14 +663,14 @@ Input: { "checklistPublicId": "chk_xxx", "title": "Write auth middleware" }
 #### Buscar y actualizar
 
 ```
-AI: Encuentra todas las cards con "login" en el título y actualiza su prioridad a alta
+AI: Encuentra todas las cards con "login" en el título en el workspace Project Alpha
 
 Tool: workspace.search
-Input: { "query": "login" }
+Input: { "workspacePublicId": "ws_xxx", "query": "login" }
 Output: { "boards": [...], "cards": [{ "publicId": "card_xxx", "title": "Implement login", ... }] }
 
 Tool: card.update
-Input: { "publicId": "card_xxx", "priority": "high" }
+Input: { "publicId": "card_xxx", "title": "Implement login (v2)" }
 ```
 
 ### Cobertura de Tests

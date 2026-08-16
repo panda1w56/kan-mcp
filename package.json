@@ -1,6 +1,6 @@
 {
   "name": "kanbn-mcp",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "MCP server for Kan.bn API - exposes 44 tools for workspace, board, list, card, label, checklist, and comment management",
   "main": "dist/index.js",
   "bin": {

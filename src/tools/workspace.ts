@@ -1,8 +1,7 @@
 import { KanClient } from '../client.js';
-import { Workspace, ToolResult, Board, Card } from '../types.js';
+import { Workspace, WorkspaceListItem, ToolResult, ROUTES } from '../types.js';
 import { success, error, assertString, assertOptionalString } from '../utils.js';
 import { toMcpError } from '../errors.js';
-import { ROUTES } from '../types.js';
 
 export interface Tool<TInput = unknown, TOutput = unknown> {
   name: string;
@@ -16,13 +15,12 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
 }
 
 interface WorkspaceListInput {
-  limit?: number;
-  offset?: number;
+  // GET /workspaces accepts no parameters
 }
 
 interface WorkspaceCreateInput {
   name: string;
-  slug: string;
+  slug?: string;
   description?: string;
 }
 
@@ -37,9 +35,10 @@ interface WorkspaceGetBySlugInput {
 interface WorkspaceUpdateInput {
   publicId: string;
   name?: string;
+  slug?: string;
   description?: string;
   showEmailsToMembers?: boolean;
-  weekStartDay?: string;
+  weekStartDay?: 0 | 1 | 6;
 }
 
 interface WorkspaceDeleteInput {
@@ -50,18 +49,40 @@ interface WorkspaceFindByNameInput {
   name: string;
 }
 
-
 interface WorkspaceSearchInput {
+  workspacePublicId: string;
   query: string;
+  limit?: number;
 }
 
 interface WorkspaceCheckSlugInput {
   slug: string;
 }
 
+interface SearchBoardItem {
+  type: 'board';
+  publicId: string;
+  title: string;
+  description: string | null;
+  slug: string;
+}
+
+interface SearchCardItem {
+  type: 'card';
+  publicId: string;
+  title: string;
+  description: string | null;
+  boardPublicId: string;
+  boardName: string;
+  listName: string;
+  cardNumber: number | null;
+}
+
+type SearchItem = SearchBoardItem | SearchCardItem;
+
 interface SearchResult {
-  boards: Board[];
-  cards: Card[];
+  boards: SearchBoardItem[];
+  cards: SearchCardItem[];
 }
 
 export const workspaceListTool: Tool<WorkspaceListInput, Workspace[]> = {
@@ -69,21 +90,13 @@ export const workspaceListTool: Tool<WorkspaceListInput, Workspace[]> = {
   description: 'Get all workspaces',
   inputSchema: {
     type: 'object',
-    properties: {
-      limit: { type: 'number' },
-      offset: { type: 'number' },
-    },
+    properties: {},
     required: [],
   },
-  handler: async (client: KanClient, input: WorkspaceListInput): Promise<ToolResult<Workspace[]>> => {
+  handler: async (client: KanClient, _input: WorkspaceListInput): Promise<ToolResult<Workspace[]>> => {
     try {
-      const queryParams = new URLSearchParams();
-      if (input.limit !== undefined) queryParams.set('limit', String(input.limit));
-      if (input.offset !== undefined) queryParams.set('offset', String(input.offset));
-      const query = queryParams.toString();
-      const path = `${ROUTES.WORKSPACES}${query ? `?${query}` : ''}`;
-      const data = await client.request<Workspace[]>(path);
-      return success(data);
+      const data = await client.request<WorkspaceListItem[]>(ROUTES.WORKSPACES);
+      return success(data.map((item) => item.workspace));
     } catch (err) {
       return error(toMcpError(err).message);
     }
@@ -92,7 +105,7 @@ export const workspaceListTool: Tool<WorkspaceListInput, Workspace[]> = {
 
 export const workspaceCreateTool: Tool<WorkspaceCreateInput, Workspace> = {
   name: 'workspace.create',
-  description: 'Create a new workspace',
+  description: 'Create a new workspace. The slug is optional and auto-generated from the name when omitted.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -100,20 +113,19 @@ export const workspaceCreateTool: Tool<WorkspaceCreateInput, Workspace> = {
       slug: { type: 'string' },
       description: { type: 'string' },
     },
-    required: ['name', 'slug'],
+    required: ['name'],
   },
   handler: async (client: KanClient, input: WorkspaceCreateInput): Promise<ToolResult<Workspace>> => {
     try {
       assertString(input.name, 'name');
-      assertString(input.slug, 'slug');
+      assertOptionalString(input.slug, 'slug');
       assertOptionalString(input.description, 'description');
+      const body: Record<string, unknown> = { name: input.name };
+      if (input.slug !== undefined) body.slug = input.slug;
+      if (input.description !== undefined) body.description = input.description;
       const data = await client.request<Workspace>(ROUTES.WORKSPACES, {
         method: 'POST',
-        body: JSON.stringify({
-          name: input.name,
-          slug: input.slug,
-          description: input.description,
-        }),
+        body: JSON.stringify(body),
       });
       return success(data);
     } catch (err) {
@@ -156,7 +168,7 @@ export const workspaceGetBySlugTool: Tool<WorkspaceGetBySlugInput, Workspace> = 
   handler: async (client: KanClient, input: WorkspaceGetBySlugInput): Promise<ToolResult<Workspace>> => {
     try {
       assertString(input.slug, 'slug');
-      const data = await client.request<Workspace>(`${ROUTES.WORKSPACES}/slug/${input.slug}`);
+      const data = await client.request<Workspace>(`${ROUTES.WORKSPACES}/${input.slug}`);
       return success(data);
     } catch (err) {
       return error(toMcpError(err).message);
@@ -177,30 +189,30 @@ export const workspaceFindByNameTool: Tool<WorkspaceFindByNameInput, Workspace> 
   handler: async (client: KanClient, input: WorkspaceFindByNameInput): Promise<ToolResult<Workspace>> => {
     try {
       assertString(input.name, 'name');
-      const workspaces = await client.request<Workspace[]>(ROUTES.WORKSPACES);
-      const match = workspaces.find((w) => w.name.toLowerCase() === input.name.toLowerCase());
+      const items = await client.request<WorkspaceListItem[]>(ROUTES.WORKSPACES);
+      const match = items.find((item) => item.workspace.name.toLowerCase() === input.name.toLowerCase());
       if (!match) {
         return error(`No workspace found with name "${input.name}"`);
       }
-      return success(match);
+      return success(match.workspace);
     } catch (err) {
       return error(toMcpError(err).message);
     }
   },
 };
 
-
 export const workspaceUpdateTool: Tool<WorkspaceUpdateInput, Workspace> = {
   name: 'workspace.update',
-  description: 'Update a workspace',
+  description: 'Update a workspace. weekStartDay must be 0 (Sunday), 1 (Monday), or 6 (Saturday).',
   inputSchema: {
     type: 'object',
     properties: {
       publicId: { type: 'string' },
       name: { type: 'string' },
+      slug: { type: 'string' },
       description: { type: 'string' },
       showEmailsToMembers: { type: 'boolean' },
-      weekStartDay: { type: 'string' },
+      weekStartDay: { type: 'number', enum: [0, 1, 6] },
     },
     required: ['publicId'],
   },
@@ -208,15 +220,16 @@ export const workspaceUpdateTool: Tool<WorkspaceUpdateInput, Workspace> = {
     try {
       assertString(input.publicId, 'publicId');
       assertOptionalString(input.name, 'name');
+      assertOptionalString(input.slug, 'slug');
       assertOptionalString(input.description, 'description');
-      assertOptionalString(input.weekStartDay, 'weekStartDay');
       const body: Record<string, unknown> = {};
       if (input.name !== undefined) body.name = input.name;
+      if (input.slug !== undefined) body.slug = input.slug;
       if (input.description !== undefined) body.description = input.description;
       if (input.showEmailsToMembers !== undefined) body.showEmailsToMembers = input.showEmailsToMembers;
       if (input.weekStartDay !== undefined) body.weekStartDay = input.weekStartDay;
       const data = await client.request<Workspace>(`${ROUTES.WORKSPACES}/${input.publicId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         body: JSON.stringify(body),
       });
       return success(data);
@@ -255,16 +268,24 @@ export const workspaceSearchTool: Tool<WorkspaceSearchInput, SearchResult> = {
   inputSchema: {
     type: 'object',
     properties: {
+      workspacePublicId: { type: 'string' },
       query: { type: 'string' },
+      limit: { type: 'number', minimum: 1, maximum: 50 },
     },
-    required: ['query'],
+    required: ['workspacePublicId', 'query'],
   },
   handler: async (client: KanClient, input: WorkspaceSearchInput): Promise<ToolResult<SearchResult>> => {
     try {
+      assertString(input.workspacePublicId, 'workspacePublicId');
       assertString(input.query, 'query');
-      const queryParams = new URLSearchParams({ q: input.query });
-      const data = await client.request<SearchResult>(`${ROUTES.WORKSPACES}/search?${queryParams}`);
-      return success(data);
+      const queryParams = new URLSearchParams({ query: input.query });
+      if (input.limit !== undefined) queryParams.set('limit', String(input.limit));
+      const items = await client.request<SearchItem[]>(
+        `${ROUTES.WORKSPACES}/${input.workspacePublicId}/search?${queryParams}`
+      );
+      const boards = items.filter((item): item is SearchBoardItem => item.type === 'board');
+      const cards = items.filter((item): item is SearchCardItem => item.type === 'card');
+      return success({ boards, cards });
     } catch (err) {
       return error(toMcpError(err).message);
     }
@@ -287,11 +308,11 @@ export const workspaceCheckSlugAvailabilityTool: Tool<WorkspaceCheckSlugInput, {
   ): Promise<ToolResult<{ available: boolean }>> => {
     try {
       assertString(input.slug, 'slug');
-      const queryParams = new URLSearchParams({ slug: input.slug });
-      const data = await client.request<{ available: boolean }>(
-        `${ROUTES.WORKSPACES}/slug-available?${queryParams}`
+      const queryParams = new URLSearchParams({ workspaceSlug: input.slug });
+      const data = await client.request<{ isAvailable: boolean; isReserved: boolean }>(
+        `${ROUTES.WORKSPACES}/check-slug-availability?${queryParams}`
       );
-      return success(data);
+      return success({ available: data.isAvailable && !data.isReserved });
     } catch (err) {
       return error(toMcpError(err).message);
     }

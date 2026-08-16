@@ -108,7 +108,7 @@ describe('list tools', () => {
 
       const result = await listUpdateTool.handler(client, input);
 
-      expect(receivedMethod).toBe('PATCH');
+      expect(receivedMethod).toBe('PUT');
       expect(receivedUrl).toContain('/lists/list-1');
       expect(result.ok).toBe(true);
       if (result.ok) {

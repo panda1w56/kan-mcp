@@ -82,6 +82,10 @@ interface CardDeleteInput {
 interface CardDuplicateInput {
   cardPublicId: string;
   targetListPublicId?: string;
+  copyLabels?: boolean;
+  copyMembers?: boolean;
+  copyChecklists?: boolean;
+  title?: string;
 }
 
 interface CardAddLabelInput {
@@ -108,6 +112,21 @@ interface CardListActivitiesInput {
   cardPublicId: string;
   limit?: number;
   cursor?: string;
+}
+
+/** Minimal card shape needed to check attached labels/members before toggling */
+interface CardDetailLite {
+  labels?: { publicId: string }[];
+  members?: { publicId: string }[];
+}
+
+async function getAttachedIds(
+  client: KanClient,
+  cardPublicId: string,
+  field: 'labels' | 'members'
+): Promise<string[]> {
+  const card = await client.request<CardDetailLite>(`${ROUTES.CARDS}/${cardPublicId}`);
+  return (card[field] ?? []).map((item) => item.publicId);
 }
 
 export const cardGetByIdTool: Tool<CardGetByIdInput, Card> = {
@@ -195,21 +214,31 @@ export const cardDeleteTool: Tool<CardDeleteInput, { success: boolean }> = {
 
 export const cardDuplicateTool: Tool<CardDuplicateInput, Card> = {
   name: 'card.duplicate',
-  description: 'Duplicate a card to the same or a different list',
+  description: 'Duplicate a card to a target list. copyLabels, copyMembers and copyChecklists default to true.',
   inputSchema: {
     type: 'object',
     properties: {
       cardPublicId: { type: 'string' },
       targetListPublicId: { type: 'string' },
+      copyLabels: { type: 'boolean' },
+      copyMembers: { type: 'boolean' },
+      copyChecklists: { type: 'boolean' },
+      title: { type: 'string' },
     },
-    required: ['cardPublicId'],
+    required: ['cardPublicId', 'targetListPublicId'],
   },
   handler: async (client: KanClient, input: CardDuplicateInput): Promise<ToolResult<Card>> => {
     try {
       assertString(input.cardPublicId, 'cardPublicId');
-      assertOptionalString(input.targetListPublicId, 'targetListPublicId');
-      const body: Record<string, unknown> = {};
-      if (input.targetListPublicId !== undefined) body.targetListPublicId = input.targetListPublicId;
+      assertString(input.targetListPublicId, 'targetListPublicId');
+      assertOptionalString(input.title, 'title');
+      const body: Record<string, unknown> = {
+        listPublicId: input.targetListPublicId,
+        copyLabels: input.copyLabels ?? true,
+        copyMembers: input.copyMembers ?? true,
+        copyChecklists: input.copyChecklists ?? true,
+      };
+      if (input.title !== undefined) body.title = input.title;
       const data = await client.request<Card>(`${ROUTES.CARDS}/${input.cardPublicId}/duplicate`, {
         method: 'POST',
         body: JSON.stringify(body),
@@ -221,9 +250,9 @@ export const cardDuplicateTool: Tool<CardDuplicateInput, Card> = {
   },
 };
 
-export const cardAddLabelTool: Tool<CardAddLabelInput, Card> = {
+export const cardAddLabelTool: Tool<CardAddLabelInput, { attached: boolean }> = {
   name: 'card.addLabel',
-  description: 'Add label to card',
+  description: 'Add label to card. Idempotent: does nothing if the label is already attached.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -232,24 +261,28 @@ export const cardAddLabelTool: Tool<CardAddLabelInput, Card> = {
     },
     required: ['cardPublicId', 'labelPublicId'],
   },
-  handler: async (client: KanClient, input: CardAddLabelInput): Promise<ToolResult<Card>> => {
+  handler: async (client: KanClient, input: CardAddLabelInput): Promise<ToolResult<{ attached: boolean }>> => {
     try {
       assertString(input.cardPublicId, 'cardPublicId');
       assertString(input.labelPublicId, 'labelPublicId');
-      const data = await client.request<Card>(
+      const attached = await getAttachedIds(client, input.cardPublicId, 'labels');
+      if (attached.includes(input.labelPublicId)) {
+        return success({ attached: true });
+      }
+      await client.request<{ newLabel: boolean }>(
         `${ROUTES.CARDS}/${input.cardPublicId}/labels/${input.labelPublicId}`,
         { method: 'PUT' }
       );
-      return success(data);
+      return success({ attached: true });
     } catch (err) {
       return error(toMcpError(err).message);
     }
   },
 };
 
-export const cardRemoveLabelTool: Tool<CardRemoveLabelInput, Card> = {
+export const cardRemoveLabelTool: Tool<CardRemoveLabelInput, { attached: boolean }> = {
   name: 'card.removeLabel',
-  description: 'Remove label from card',
+  description: 'Remove label from card. Idempotent: does nothing if the label is not attached.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -258,24 +291,28 @@ export const cardRemoveLabelTool: Tool<CardRemoveLabelInput, Card> = {
     },
     required: ['cardPublicId', 'labelPublicId'],
   },
-  handler: async (client: KanClient, input: CardRemoveLabelInput): Promise<ToolResult<Card>> => {
+  handler: async (client: KanClient, input: CardRemoveLabelInput): Promise<ToolResult<{ attached: boolean }>> => {
     try {
       assertString(input.cardPublicId, 'cardPublicId');
       assertString(input.labelPublicId, 'labelPublicId');
-      const data = await client.request<Card>(
+      const attached = await getAttachedIds(client, input.cardPublicId, 'labels');
+      if (!attached.includes(input.labelPublicId)) {
+        return success({ attached: false });
+      }
+      await client.request<{ newLabel: boolean }>(
         `${ROUTES.CARDS}/${input.cardPublicId}/labels/${input.labelPublicId}`,
-        { method: 'DELETE' }
+        { method: 'PUT' }
       );
-      return success(data);
+      return success({ attached: false });
     } catch (err) {
       return error(toMcpError(err).message);
     }
   },
 };
 
-export const cardAddMemberTool: Tool<CardAddMemberInput, Card> = {
+export const cardAddMemberTool: Tool<CardAddMemberInput, { attached: boolean }> = {
   name: 'card.addMember',
-  description: 'Add member to card',
+  description: 'Add member to card. Idempotent: does nothing if the member is already attached.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -284,24 +321,28 @@ export const cardAddMemberTool: Tool<CardAddMemberInput, Card> = {
     },
     required: ['cardPublicId', 'memberPublicId'],
   },
-  handler: async (client: KanClient, input: CardAddMemberInput): Promise<ToolResult<Card>> => {
+  handler: async (client: KanClient, input: CardAddMemberInput): Promise<ToolResult<{ attached: boolean }>> => {
     try {
       assertString(input.cardPublicId, 'cardPublicId');
       assertString(input.memberPublicId, 'memberPublicId');
-      const data = await client.request<Card>(
+      const attached = await getAttachedIds(client, input.cardPublicId, 'members');
+      if (attached.includes(input.memberPublicId)) {
+        return success({ attached: true });
+      }
+      await client.request<{ newMember: boolean }>(
         `${ROUTES.CARDS}/${input.cardPublicId}/members/${input.memberPublicId}`,
         { method: 'PUT' }
       );
-      return success(data);
+      return success({ attached: true });
     } catch (err) {
       return error(toMcpError(err).message);
     }
   },
 };
 
-export const cardRemoveMemberTool: Tool<CardRemoveMemberInput, Card> = {
+export const cardRemoveMemberTool: Tool<CardRemoveMemberInput, { attached: boolean }> = {
   name: 'card.removeMember',
-  description: 'Remove member from card',
+  description: 'Remove member from card. Idempotent: does nothing if the member is not attached.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -310,15 +351,19 @@ export const cardRemoveMemberTool: Tool<CardRemoveMemberInput, Card> = {
     },
     required: ['cardPublicId', 'memberPublicId'],
   },
-  handler: async (client: KanClient, input: CardRemoveMemberInput): Promise<ToolResult<Card>> => {
+  handler: async (client: KanClient, input: CardRemoveMemberInput): Promise<ToolResult<{ attached: boolean }>> => {
     try {
       assertString(input.cardPublicId, 'cardPublicId');
       assertString(input.memberPublicId, 'memberPublicId');
-      const data = await client.request<Card>(
+      const attached = await getAttachedIds(client, input.cardPublicId, 'members');
+      if (!attached.includes(input.memberPublicId)) {
+        return success({ attached: false });
+      }
+      await client.request<{ newMember: boolean }>(
         `${ROUTES.CARDS}/${input.cardPublicId}/members/${input.memberPublicId}`,
-        { method: 'DELETE' }
+        { method: 'PUT' }
       );
-      return success(data);
+      return success({ attached: false });
     } catch (err) {
       return error(toMcpError(err).message);
     }

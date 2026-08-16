@@ -368,29 +368,51 @@ describe('card tools', () => {
   });
 
   describe('card.addLabel', () => {
-    test('adds a label to a card', async () => {
+    test('adds a label via PUT toggle when not attached', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = { cardPublicId: 'card-1', labelPublicId: 'label-1' };
 
-      let receivedUrl = '';
-      let receivedMethod = '';
+      const calls: { url: string; method: string }[] = [];
 
       globalThis.fetch = async (url, init) => {
-        receivedUrl = url as string;
-        receivedMethod = init?.method ?? 'GET';
-        return new Response(JSON.stringify(mockCard), {
-          status: 200,
-          ok: true,
-        }) as Response;
+        const method = init?.method ?? 'GET';
+        calls.push({ url: url as string, method });
+        if (method === 'GET') {
+          return new Response(JSON.stringify({ labels: [], members: [] }), { status: 200, ok: true }) as Response;
+        }
+        return new Response(JSON.stringify({ newLabel: true }), { status: 200, ok: true }) as Response;
       };
 
       const result = await cardAddLabelTool.handler(client, input);
 
-      expect(receivedMethod).toBe('PUT');
-      expect(receivedUrl).toContain('/cards/card-1/labels/label-1');
+      expect(calls).toHaveLength(2);
+      expect(calls[1]?.method).toBe('PUT');
+      expect(calls[1]?.url).toContain('/cards/card-1/labels/label-1');
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data).toEqual(mockCard);
+        expect(result.data).toEqual({ attached: true });
+      }
+    });
+
+    test('skips toggle when label already attached', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = { cardPublicId: 'card-1', labelPublicId: 'label-1' };
+
+      const calls: { url: string; method: string }[] = [];
+
+      globalThis.fetch = async (url, init) => {
+        const method = init?.method ?? 'GET';
+        calls.push({ url: url as string, method });
+        return new Response(JSON.stringify({ labels: [{ publicId: 'label-1' }], members: [] }), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await cardAddLabelTool.handler(client, input);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.method).toBe('GET');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toEqual({ attached: true });
       }
     });
 
@@ -422,29 +444,51 @@ describe('card tools', () => {
   });
 
   describe('card.removeLabel', () => {
-    test('removes a label from a card', async () => {
+    test('removes a label via PUT toggle when attached', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = { cardPublicId: 'card-1', labelPublicId: 'label-1' };
 
-      let receivedUrl = '';
-      let receivedMethod = '';
+      const calls: { url: string; method: string }[] = [];
 
       globalThis.fetch = async (url, init) => {
-        receivedUrl = url as string;
-        receivedMethod = init?.method ?? 'GET';
-        return new Response(JSON.stringify(mockCard), {
-          status: 200,
-          ok: true,
-        }) as Response;
+        const method = init?.method ?? 'GET';
+        calls.push({ url: url as string, method });
+        if (method === 'GET') {
+          return new Response(JSON.stringify({ labels: [{ publicId: 'label-1' }], members: [] }), { status: 200, ok: true }) as Response;
+        }
+        return new Response(JSON.stringify({ newLabel: false }), { status: 200, ok: true }) as Response;
       };
 
       const result = await cardRemoveLabelTool.handler(client, input);
 
-      expect(receivedMethod).toBe('DELETE');
-      expect(receivedUrl).toContain('/cards/card-1/labels/label-1');
+      expect(calls).toHaveLength(2);
+      expect(calls[1]?.method).toBe('PUT');
+      expect(calls[1]?.url).toContain('/cards/card-1/labels/label-1');
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data).toEqual(mockCard);
+        expect(result.data).toEqual({ attached: false });
+      }
+    });
+
+    test('skips toggle when label not attached', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = { cardPublicId: 'card-1', labelPublicId: 'label-1' };
+
+      const calls: { url: string; method: string }[] = [];
+
+      globalThis.fetch = async (url, init) => {
+        const method = init?.method ?? 'GET';
+        calls.push({ url: url as string, method });
+        return new Response(JSON.stringify({ labels: [], members: [] }), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await cardRemoveLabelTool.handler(client, input);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.method).toBe('GET');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toEqual({ attached: false });
       }
     });
 
@@ -476,29 +520,51 @@ describe('card tools', () => {
   });
 
   describe('card.addMember', () => {
-    test('adds a member to a card', async () => {
+    test('adds a member via PUT toggle when not attached', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = { cardPublicId: 'card-1', memberPublicId: 'member-1' };
 
-      let receivedUrl = '';
-      let receivedMethod = '';
+      const calls: { url: string; method: string }[] = [];
 
       globalThis.fetch = async (url, init) => {
-        receivedUrl = url as string;
-        receivedMethod = init?.method ?? 'GET';
-        return new Response(JSON.stringify(mockCard), {
-          status: 200,
-          ok: true,
-        }) as Response;
+        const method = init?.method ?? 'GET';
+        calls.push({ url: url as string, method });
+        if (method === 'GET') {
+          return new Response(JSON.stringify({ labels: [], members: [] }), { status: 200, ok: true }) as Response;
+        }
+        return new Response(JSON.stringify({ newMember: true }), { status: 200, ok: true }) as Response;
       };
 
       const result = await cardAddMemberTool.handler(client, input);
 
-      expect(receivedMethod).toBe('PUT');
-      expect(receivedUrl).toContain('/cards/card-1/members/member-1');
+      expect(calls).toHaveLength(2);
+      expect(calls[1]?.method).toBe('PUT');
+      expect(calls[1]?.url).toContain('/cards/card-1/members/member-1');
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data).toEqual(mockCard);
+        expect(result.data).toEqual({ attached: true });
+      }
+    });
+
+    test('skips toggle when member already attached', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = { cardPublicId: 'card-1', memberPublicId: 'member-1' };
+
+      const calls: { url: string; method: string }[] = [];
+
+      globalThis.fetch = async (url, init) => {
+        const method = init?.method ?? 'GET';
+        calls.push({ url: url as string, method });
+        return new Response(JSON.stringify({ labels: [], members: [{ publicId: 'member-1' }] }), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await cardAddMemberTool.handler(client, input);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.method).toBe('GET');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toEqual({ attached: true });
       }
     });
 
@@ -530,29 +596,51 @@ describe('card tools', () => {
   });
 
   describe('card.removeMember', () => {
-    test('removes a member from a card', async () => {
+    test('removes a member via PUT toggle when attached', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = { cardPublicId: 'card-1', memberPublicId: 'member-1' };
 
-      let receivedUrl = '';
-      let receivedMethod = '';
+      const calls: { url: string; method: string }[] = [];
 
       globalThis.fetch = async (url, init) => {
-        receivedUrl = url as string;
-        receivedMethod = init?.method ?? 'GET';
-        return new Response(JSON.stringify(mockCard), {
-          status: 200,
-          ok: true,
-        }) as Response;
+        const method = init?.method ?? 'GET';
+        calls.push({ url: url as string, method });
+        if (method === 'GET') {
+          return new Response(JSON.stringify({ labels: [], members: [{ publicId: 'member-1' }] }), { status: 200, ok: true }) as Response;
+        }
+        return new Response(JSON.stringify({ newMember: false }), { status: 200, ok: true }) as Response;
       };
 
       const result = await cardRemoveMemberTool.handler(client, input);
 
-      expect(receivedMethod).toBe('DELETE');
-      expect(receivedUrl).toContain('/cards/card-1/members/member-1');
+      expect(calls).toHaveLength(2);
+      expect(calls[1]?.method).toBe('PUT');
+      expect(calls[1]?.url).toContain('/cards/card-1/members/member-1');
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data).toEqual(mockCard);
+        expect(result.data).toEqual({ attached: false });
+      }
+    });
+
+    test('skips toggle when member not attached', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = { cardPublicId: 'card-1', memberPublicId: 'member-1' };
+
+      const calls: { url: string; method: string }[] = [];
+
+      globalThis.fetch = async (url, init) => {
+        const method = init?.method ?? 'GET';
+        calls.push({ url: url as string, method });
+        return new Response(JSON.stringify({ labels: [], members: [] }), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await cardRemoveMemberTool.handler(client, input);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.method).toBe('GET');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toEqual({ attached: false });
       }
     });
 
@@ -654,7 +742,7 @@ describe('card tools', () => {
     });
   });
   describe('card.duplicate', () => {
-    test('duplicates a card', async () => {
+    test('duplicates a card with default copy flags', async () => {
       const client = new KanClient(TEST_API_KEY);
       let receivedUrl = '';
       let receivedMethod = '';
@@ -667,18 +755,23 @@ describe('card tools', () => {
         return new Response(JSON.stringify(mockCard), { status: 201, ok: true }) as Response;
       };
 
-      const result = await cardDuplicateTool.handler(client, { cardPublicId: 'card-1' });
+      const result = await cardDuplicateTool.handler(client, { cardPublicId: 'card-1', targetListPublicId: 'list-1' });
 
       expect(receivedMethod).toBe('POST');
       expect(receivedUrl).toContain('/cards/card-1/duplicate');
-      expect(JSON.parse(receivedBody)).toEqual({});
+      expect(JSON.parse(receivedBody)).toEqual({
+        listPublicId: 'list-1',
+        copyLabels: true,
+        copyMembers: true,
+        copyChecklists: true,
+      });
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.publicId).toBe('card-1');
       }
     });
 
-    test('duplicates a card to a different list', async () => {
+    test('duplicates a card to a different list with custom copy flags', async () => {
       const client = new KanClient(TEST_API_KEY);
       let receivedBody = '';
 
@@ -687,10 +780,34 @@ describe('card tools', () => {
         return new Response(JSON.stringify(mockCard), { status: 201, ok: true }) as Response;
       };
 
-      const result = await cardDuplicateTool.handler(client, { cardPublicId: 'card-1', targetListPublicId: 'list-2' });
+      const result = await cardDuplicateTool.handler(client, {
+        cardPublicId: 'card-1',
+        targetListPublicId: 'list-2',
+        copyLabels: false,
+        copyMembers: false,
+        copyChecklists: true,
+        title: 'Copy of card',
+      });
 
-      expect(JSON.parse(receivedBody)).toEqual({ targetListPublicId: 'list-2' });
+      expect(JSON.parse(receivedBody)).toEqual({
+        listPublicId: 'list-2',
+        copyLabels: false,
+        copyMembers: false,
+        copyChecklists: true,
+        title: 'Copy of card',
+      });
       expect(result.ok).toBe(true);
+    });
+
+    test('returns error when targetListPublicId is missing', async () => {
+      const client = new KanClient(TEST_API_KEY);
+
+      const result = await cardDuplicateTool.handler(client, { cardPublicId: 'card-1' } as any);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('targetListPublicId');
+      }
     });
 
     test('returns error on API failure', async () => {
@@ -698,7 +815,7 @@ describe('card tools', () => {
       globalThis.fetch = async () =>
         new Response(JSON.stringify({ message: 'Bad Request' }), { status: 400, ok: false }) as Response;
 
-      const result = await cardDuplicateTool.handler(client, { cardPublicId: 'card-1' });
+      const result = await cardDuplicateTool.handler(client, { cardPublicId: 'card-1', targetListPublicId: 'list-1' });
 
       expect(result.ok).toBe(false);
     });

@@ -78,7 +78,7 @@ export const listUpdateTool: Tool<ListUpdateInput, List> = {
       if (input.name !== undefined) body.name = input.name;
       if (input.index !== undefined) body.index = input.index;
       const data = await client.request<List>(`${ROUTES.LISTS}/${input.publicId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         body: JSON.stringify(body),
       });
       return success(data);

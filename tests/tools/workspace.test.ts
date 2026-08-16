@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { KanClient } from '../../src/client';
-import { Workspace, ToolResult } from '../../src/types';
+import { Workspace, WorkspaceListItem } from '../../src/types';
 import {
   workspaceListTool,
   workspaceCreateTool,
@@ -24,25 +24,26 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
+const mockWorkspace: Workspace = {
+  publicId: 'ws-1',
+  name: 'Workspace 1',
+  slug: 'workspace-1',
+  description: 'Test workspace',
+  showEmailsToMembers: false,
+  weekStartDay: 1,
+};
+
+function wrap(workspaces: Workspace[]): WorkspaceListItem[] {
+  return workspaces.map((workspace) => ({ role: 'admin', workspace }));
+}
+
 describe('workspace tools', () => {
   describe('workspace.list', () => {
-    test('returns list of workspaces', async () => {
+    test('returns list of workspaces unwrapped from role items', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const mockWorkspaces: Workspace[] = [
-        {
-          publicId: 'ws-1',
-          name: 'Workspace 1',
-          slug: 'workspace-1',
-          description: 'Test workspace',
-          showEmailsToMembers: false,
-          weekStartDay: 'monday',
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z',
-        },
-      ];
 
       globalThis.fetch = async () =>
-        new Response(JSON.stringify(mockWorkspaces), {
+        new Response(JSON.stringify(wrap([mockWorkspace])), {
           status: 200,
           ok: true,
         }) as Response;
@@ -51,7 +52,7 @@ describe('workspace tools', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data).toEqual(mockWorkspaces);
+        expect(result.data).toEqual([mockWorkspace]);
       }
     });
 
@@ -75,18 +76,9 @@ describe('workspace tools', () => {
   });
 
   describe('workspace.create', () => {
-    test('creates a workspace', async () => {
+    test('creates a workspace with slug', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = { name: 'New Workspace', slug: 'new-workspace' };
-      const mockWorkspace: Workspace = {
-        publicId: 'ws-new',
-        name: 'New Workspace',
-        slug: 'new-workspace',
-        showEmailsToMembers: false,
-        weekStartDay: 'monday',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      };
 
       let receivedUrl = '';
       let receivedMethod = '';
@@ -113,6 +105,26 @@ describe('workspace tools', () => {
       }
     });
 
+    test('creates a workspace without slug (auto-generated)', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = { name: 'New Workspace' };
+
+      let receivedBody = '';
+
+      globalThis.fetch = async (url, init) => {
+        receivedBody = init?.body as string;
+        return new Response(JSON.stringify(mockWorkspace), {
+          status: 201,
+          ok: true,
+        }) as Response;
+      };
+
+      const result = await workspaceCreateTool.handler(client, input);
+
+      expect(JSON.parse(receivedBody)).toEqual({ name: 'New Workspace' });
+      expect(result.ok).toBe(true);
+    });
+
     test('returns error when name is missing', async () => {
       const client = new KanClient(TEST_API_KEY);
 
@@ -123,41 +135,26 @@ describe('workspace tools', () => {
         expect(result.error).toContain('name');
       }
     });
-
-    test('returns error when slug is missing', async () => {
-      const client = new KanClient(TEST_API_KEY);
-
-      const result = await workspaceCreateTool.handler(client, { name: 'Test' } as any);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toContain('slug');
-      }
-    });
   });
 
   describe('workspace.getById', () => {
     test('returns workspace by public ID', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = { publicId: 'ws-123' };
-      const mockWorkspace: Workspace = {
-        publicId: 'ws-123',
-        name: 'Test Workspace',
-        slug: 'test-workspace',
-        showEmailsToMembers: false,
-        weekStartDay: 'monday',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      };
 
-      globalThis.fetch = async () =>
-        new Response(JSON.stringify(mockWorkspace), {
+      let receivedUrl = '';
+
+      globalThis.fetch = async (url) => {
+        receivedUrl = url as string;
+        return new Response(JSON.stringify(mockWorkspace), {
           status: 200,
           ok: true,
         }) as Response;
+      };
 
       const result = await workspaceGetByIdTool.handler(client, input);
 
+      expect(receivedUrl).toContain('/workspaces/ws-123');
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data).toEqual(mockWorkspace);
@@ -180,24 +177,21 @@ describe('workspace tools', () => {
     test('returns workspace by slug', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = { slug: 'my-workspace' };
-      const mockWorkspace: Workspace = {
-        publicId: 'ws-456',
-        name: 'My Workspace',
-        slug: 'my-workspace',
-        showEmailsToMembers: true,
-        weekStartDay: 'sunday',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      };
 
-      globalThis.fetch = async () =>
-        new Response(JSON.stringify(mockWorkspace), {
+      let receivedUrl = '';
+
+      globalThis.fetch = async (url) => {
+        receivedUrl = url as string;
+        return new Response(JSON.stringify(mockWorkspace), {
           status: 200,
           ok: true,
         }) as Response;
+      };
 
       const result = await workspaceGetBySlugTool.handler(client, input);
 
+      expect(receivedUrl).toContain('/workspaces/my-workspace');
+      expect(receivedUrl).not.toContain('/slug/');
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data).toEqual(mockWorkspace);
@@ -217,18 +211,10 @@ describe('workspace tools', () => {
   });
 
   describe('workspace.update', () => {
-    test('updates a workspace', async () => {
+    test('updates a workspace with PUT', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = { publicId: 'ws-123', name: 'Updated Name' };
-      const mockWorkspace: Workspace = {
-        publicId: 'ws-123',
-        name: 'Updated Name',
-        slug: 'test-workspace',
-        showEmailsToMembers: false,
-        weekStartDay: 'monday',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-02T00:00:00Z',
-      };
+      const updated = { ...mockWorkspace, name: 'Updated Name' };
 
       let receivedUrl = '';
       let receivedMethod = '';
@@ -236,7 +222,7 @@ describe('workspace tools', () => {
       globalThis.fetch = async (url, init) => {
         receivedUrl = url as string;
         receivedMethod = init?.method ?? 'GET';
-        return new Response(JSON.stringify(mockWorkspace), {
+        return new Response(JSON.stringify(updated), {
           status: 200,
           ok: true,
         }) as Response;
@@ -244,12 +230,29 @@ describe('workspace tools', () => {
 
       const result = await workspaceUpdateTool.handler(client, input);
 
-      expect(receivedMethod).toBe('PATCH');
+      expect(receivedMethod).toBe('PUT');
       expect(receivedUrl).toContain('/workspaces/ws-123');
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.name).toBe('Updated Name');
       }
+    });
+
+    test('passes weekStartDay as number', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = { publicId: 'ws-123', weekStartDay: 6 as const };
+
+      let receivedBody = '';
+
+      globalThis.fetch = async (url, init) => {
+        receivedBody = init?.body as string;
+        return new Response(JSON.stringify(mockWorkspace), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await workspaceUpdateTool.handler(client, input);
+
+      expect(JSON.parse(receivedBody)).toEqual({ weekStartDay: 6 });
+      expect(result.ok).toBe(true);
     });
 
     test('returns error when publicId is missing', async () => {
@@ -304,55 +307,69 @@ describe('workspace tools', () => {
   });
 
   describe('workspace.search', () => {
-    test('searches boards and cards', async () => {
+    test('searches boards and cards within a workspace', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const input = { query: 'test' };
-      const mockResponse = {
-        boards: [
-          {
-            publicId: 'board-1',
-            workspacePublicId: 'ws-1',
-            name: 'Test Board',
-            slug: 'test-board',
-            visibility: 'public' as const,
-            type: 'regular' as const,
-            isArchived: false,
-            favorite: false,
-            createdAt: '2024-01-01T00:00:00Z',
-            updatedAt: '2024-01-01T00:00:00Z',
-          },
-        ],
-        cards: [
-          {
-            publicId: 'card-1',
-            listPublicId: 'list-1',
-            title: 'Test Card',
-            index: 0,
-            createdAt: '2024-01-01T00:00:00Z',
-            updatedAt: '2024-01-01T00:00:00Z',
-          },
-        ],
-      };
+      const input = { workspacePublicId: 'ws-1', query: 'test' };
+      const mockItems = [
+        { type: 'board', publicId: 'board-1', title: 'Test Board', description: null, slug: 'test-board' },
+        { type: 'card', publicId: 'card-1', title: 'Test Card', description: null, boardPublicId: 'board-1', boardName: 'Test Board', listName: 'To Do', cardNumber: 1 },
+      ];
 
-      globalThis.fetch = async () =>
-        new Response(JSON.stringify(mockResponse), {
+      let receivedUrl = '';
+
+      globalThis.fetch = async (url) => {
+        receivedUrl = url as string;
+        return new Response(JSON.stringify(mockItems), {
           status: 200,
           ok: true,
         }) as Response;
+      };
 
       const result = await workspaceSearchTool.handler(client, input);
 
+      expect(receivedUrl).toContain('/workspaces/ws-1/search');
+      expect(receivedUrl).toContain('query=test');
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.boards).toHaveLength(1);
         expect(result.data.cards).toHaveLength(1);
+        expect(result.data.boards[0]?.publicId).toBe('board-1');
+        expect(result.data.cards[0]?.publicId).toBe('card-1');
+      }
+    });
+
+    test('passes limit to API', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = { workspacePublicId: 'ws-1', query: 'test', limit: 5 };
+
+      let receivedUrl = '';
+
+      globalThis.fetch = async (url) => {
+        receivedUrl = url as string;
+        return new Response(JSON.stringify([]), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await workspaceSearchTool.handler(client, input);
+
+      expect(receivedUrl).toContain('limit=5');
+      expect(result.ok).toBe(true);
+    });
+
+    test('returns error when workspacePublicId is missing', async () => {
+      const client = new KanClient(TEST_API_KEY);
+
+      const result = await workspaceSearchTool.handler(client, { query: 'test' } as any);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('workspacePublicId');
       }
     });
 
     test('returns error when query is missing', async () => {
       const client = new KanClient(TEST_API_KEY);
 
-      const result = await workspaceSearchTool.handler(client, {} as any);
+      const result = await workspaceSearchTool.handler(client, { workspacePublicId: 'ws-1' } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -362,10 +379,35 @@ describe('workspace tools', () => {
   });
 
   describe('workspace.checkSlugAvailability', () => {
-    test('returns availability status', async () => {
+    test('returns available when slug is available and not reserved', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = { slug: 'my-workspace' };
-      const mockResponse = { available: true };
+      const mockResponse = { isAvailable: true, isReserved: false };
+
+      let receivedUrl = '';
+
+      globalThis.fetch = async (url) => {
+        receivedUrl = url as string;
+        return new Response(JSON.stringify(mockResponse), {
+          status: 200,
+          ok: true,
+        }) as Response;
+      };
+
+      const result = await workspaceCheckSlugAvailabilityTool.handler(client, input);
+
+      expect(receivedUrl).toContain('/workspaces/check-slug-availability');
+      expect(receivedUrl).toContain('workspaceSlug=my-workspace');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.available).toBe(true);
+      }
+    });
+
+    test('returns unavailable when slug is reserved', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = { slug: 'reserved-workspace' };
+      const mockResponse = { isAvailable: true, isReserved: true };
 
       globalThis.fetch = async () =>
         new Response(JSON.stringify(mockResponse), {
@@ -377,7 +419,7 @@ describe('workspace tools', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data.available).toBe(true);
+        expect(result.data.available).toBe(false);
       }
     });
 
@@ -392,15 +434,14 @@ describe('workspace tools', () => {
       }
     });
   });
+
   describe('workspace.findByName', () => {
     test('finds workspace by name (case-insensitive)', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const mockWorkspaces: Workspace[] = [
-        { publicId: 'ws-1', name: 'Project Alpha', slug: 'project-alpha', description: 'Test workspace', showEmailsToMembers: false, weekStartDay: 'monday', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
-      ];
+      const target = { ...mockWorkspace, name: 'Project Alpha' };
 
       globalThis.fetch = async () =>
-        new Response(JSON.stringify(mockWorkspaces), { status: 200, ok: true }) as Response;
+        new Response(JSON.stringify(wrap([target])), { status: 200, ok: true }) as Response;
 
       const result = await workspaceFindByNameTool.handler(client, { name: 'project alpha' });
 

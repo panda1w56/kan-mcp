@@ -26,8 +26,8 @@ interface LabelGetByIdInput {
 
 interface LabelUpdateInput {
   publicId: string;
-  name?: string;
-  colourCode?: string;
+  name: string;
+  colourCode: string;
 }
 
 interface LabelDeleteInput {
@@ -90,7 +90,7 @@ export const labelGetByIdTool: Tool<LabelGetByIdInput, Label> = {
 
 export const labelUpdateTool: Tool<LabelUpdateInput, Label> = {
   name: 'label.update',
-  description: 'Update a label',
+  description: 'Update a label. Both name and colourCode are required by the API.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -98,19 +98,16 @@ export const labelUpdateTool: Tool<LabelUpdateInput, Label> = {
       name: { type: 'string' },
       colourCode: { type: 'string' },
     },
-    required: ['publicId'],
+    required: ['publicId', 'name', 'colourCode'],
   },
   handler: async (client: KanClient, input: LabelUpdateInput): Promise<ToolResult<Label>> => {
     try {
       assertString(input.publicId, 'publicId');
-      assertOptionalString(input.name, 'name');
-      assertOptionalString(input.colourCode, 'colourCode');
-      const body: Record<string, unknown> = {};
-      if (input.name !== undefined) body.name = input.name;
-      if (input.colourCode !== undefined) body.colourCode = input.colourCode;
+      assertString(input.name, 'name');
+      assertString(input.colourCode, 'colourCode');
       const data = await client.request<Label>(`${ROUTES.LABELS}/${input.publicId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(body),
+        method: 'PUT',
+        body: JSON.stringify({ name: input.name, colourCode: input.colourCode }),
       });
       return success(data);
     } catch (err) {

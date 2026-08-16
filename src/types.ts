@@ -44,11 +44,19 @@ export interface Workspace {
   publicId: WorkspaceId;
   name: string;
   slug: string;
-  description?: string;
-  showEmailsToMembers: boolean;
-  weekStartDay: string;
-  createdAt: string;
-  updatedAt: string;
+  description?: string | null;
+  showEmailsToMembers?: boolean | null;
+  weekStartDay?: number | null;
+  plan?: string;
+  cardPrefix?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** GET /workspaces returns items wrapped with the caller's role */
+export interface WorkspaceListItem {
+  role: string;
+  workspace: Workspace;
 }
 
 export interface Board {

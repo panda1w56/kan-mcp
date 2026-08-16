@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { KanClient } from '../../src/client';
-import { Board, ToolResult, Workspace } from '../../src/types';
+import { Board } from '../../src/types';
 import {
   boardListTool,
   boardCreateTool,
@@ -38,25 +38,7 @@ const mockBoard: Board = {
 
 describe('board tools', () => {
   describe('board.list', () => {
-    test('returns list of boards', async () => {
-      const client = new KanClient(TEST_API_KEY);
-      const mockBoards: Board[] = [mockBoard];
-
-      globalThis.fetch = async () =>
-        new Response(JSON.stringify(mockBoards), {
-          status: 200,
-          ok: true,
-        }) as Response;
-
-      const result = await boardListTool.handler(client, {});
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.data).toEqual(mockBoards);
-      }
-    });
-
-    test('returns boards filtered by workspacePublicId', async () => {
+    test('returns list of boards for a workspace', async () => {
       const client = new KanClient(TEST_API_KEY);
       const mockBoards: Board[] = [mockBoard];
       let receivedUrl = '';
@@ -71,30 +53,53 @@ describe('board tools', () => {
 
       const result = await boardListTool.handler(client, { workspacePublicId: 'ws-1' });
 
-      expect(receivedUrl).toContain('workspacePublicId=ws-1');
+      expect(receivedUrl).toContain('/workspaces/ws-1/boards');
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data).toEqual(mockBoards);
       }
     });
 
-    test('returns boards filtered by visibility', async () => {
+    test('passes type filter to API', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const mockBoards: Board[] = [mockBoard];
       let receivedUrl = '';
 
       globalThis.fetch = async (url) => {
         receivedUrl = url as string;
-        return new Response(JSON.stringify(mockBoards), {
-          status: 200,
-          ok: true,
-        }) as Response;
+        return new Response(JSON.stringify([]), { status: 200, ok: true }) as Response;
       };
 
-      const result = await boardListTool.handler(client, { visibility: 'public' });
+      const result = await boardListTool.handler(client, { workspacePublicId: 'ws-1', type: 'template' });
 
-      expect(receivedUrl).toContain('visibility=public');
+      expect(receivedUrl).toContain('/workspaces/ws-1/boards');
+      expect(receivedUrl).toContain('type=template');
       expect(result.ok).toBe(true);
+    });
+
+    test('passes archived filter to API', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      let receivedUrl = '';
+
+      globalThis.fetch = async (url) => {
+        receivedUrl = url as string;
+        return new Response(JSON.stringify([]), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await boardListTool.handler(client, { workspacePublicId: 'ws-1', archived: true });
+
+      expect(receivedUrl).toContain('archived=true');
+      expect(result.ok).toBe(true);
+    });
+
+    test('returns error when workspacePublicId is missing', async () => {
+      const client = new KanClient(TEST_API_KEY);
+
+      const result = await boardListTool.handler(client, {} as any);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('workspacePublicId');
+      }
     });
 
     test('returns error on API failure', async () => {
@@ -107,7 +112,7 @@ describe('board tools', () => {
           ok: false,
         }) as Response;
 
-      const result = await boardListTool.handler(client, {});
+      const result = await boardListTool.handler(client, { workspacePublicId: 'ws-1' });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -117,14 +122,13 @@ describe('board tools', () => {
   });
 
   describe('board.create', () => {
-    test('creates a board', async () => {
+    test('creates a board with default empty lists and labels', async () => {
       const client = new KanClient(TEST_API_KEY);
       const input = {
         workspacePublicId: 'ws-1',
         name: 'New Board',
-        slug: 'new-board',
-        visibility: 'public' as const,
       };
+      const mockResponse = { publicId: 'board-new', name: 'New Board' };
 
       let receivedUrl = '';
       let receivedMethod = '';
@@ -134,8 +138,8 @@ describe('board tools', () => {
         receivedUrl = url as string;
         receivedMethod = init?.method ?? 'GET';
         receivedBody = init?.body as string;
-        return new Response(JSON.stringify(mockBoard), {
-          status: 201,
+        return new Response(JSON.stringify(mockResponse), {
+          status: 200,
           ok: true,
         }) as Response;
       };
@@ -143,12 +147,72 @@ describe('board tools', () => {
       const result = await boardCreateTool.handler(client, input);
 
       expect(receivedMethod).toBe('POST');
-      expect(receivedUrl).toContain('/boards');
-      expect(JSON.parse(receivedBody)).toEqual(input);
+      expect(receivedUrl).toContain('/workspaces/ws-1/boards');
+      expect(JSON.parse(receivedBody)).toEqual({ name: 'New Board', lists: [], labels: [] });
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data).toEqual(mockBoard);
+        expect(result.data).toEqual(mockResponse);
       }
+    });
+
+    test('creates a board with initial lists and labels', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = {
+        workspacePublicId: 'ws-1',
+        name: 'Sprint Board',
+        lists: ['To Do', 'Done'],
+        labels: ['bug', 'feature'],
+      };
+
+      let receivedBody = '';
+
+      globalThis.fetch = async (url, init) => {
+        receivedBody = init?.body as string;
+        return new Response(JSON.stringify({ publicId: 'board-2', name: 'Sprint Board' }), {
+          status: 200,
+          ok: true,
+        }) as Response;
+      };
+
+      const result = await boardCreateTool.handler(client, input);
+
+      expect(JSON.parse(receivedBody)).toEqual({
+        name: 'Sprint Board',
+        lists: ['To Do', 'Done'],
+        labels: ['bug', 'feature'],
+      });
+      expect(result.ok).toBe(true);
+    });
+
+    test('passes type and sourceBoardPublicId when cloning', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = {
+        workspacePublicId: 'ws-1',
+        name: 'Cloned Board',
+        type: 'template' as const,
+        sourceBoardPublicId: 'board-source',
+      };
+
+      let receivedBody = '';
+
+      globalThis.fetch = async (url, init) => {
+        receivedBody = init?.body as string;
+        return new Response(JSON.stringify({ publicId: 'board-3', name: 'Cloned Board' }), {
+          status: 200,
+          ok: true,
+        }) as Response;
+      };
+
+      const result = await boardCreateTool.handler(client, input);
+
+      expect(JSON.parse(receivedBody)).toEqual({
+        name: 'Cloned Board',
+        lists: [],
+        labels: [],
+        type: 'template',
+        sourceBoardPublicId: 'board-source',
+      });
+      expect(result.ok).toBe(true);
     });
 
     test('returns error when workspacePublicId is missing', async () => {
@@ -156,8 +220,6 @@ describe('board tools', () => {
 
       const result = await boardCreateTool.handler(client, {
         name: 'Test',
-        slug: 'test',
-        visibility: 'public',
       } as any);
 
       expect(result.ok).toBe(false);
@@ -171,8 +233,6 @@ describe('board tools', () => {
 
       const result = await boardCreateTool.handler(client, {
         workspacePublicId: 'ws-1',
-        slug: 'test',
-        visibility: 'public',
       } as any);
 
       expect(result.ok).toBe(false);
@@ -181,33 +241,18 @@ describe('board tools', () => {
       }
     });
 
-    test('returns error when slug is missing', async () => {
+    test('returns error when lists contains non-strings', async () => {
       const client = new KanClient(TEST_API_KEY);
 
       const result = await boardCreateTool.handler(client, {
         workspacePublicId: 'ws-1',
         name: 'Test',
-        visibility: 'public',
+        lists: ['ok', 42],
       } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('slug');
-      }
-    });
-
-    test('returns error when visibility is missing', async () => {
-      const client = new KanClient(TEST_API_KEY);
-
-      const result = await boardCreateTool.handler(client, {
-        workspacePublicId: 'ws-1',
-        name: 'Test',
-        slug: 'test',
-      } as any);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toContain('visibility');
+        expect(result.error).toContain('lists');
       }
     });
   });
@@ -314,9 +359,9 @@ describe('board tools', () => {
   });
 
   describe('board.getBySlug', () => {
-    test('returns board by slug', async () => {
+    test('returns board by workspace slug and board slug', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const input = { workspacePublicId: 'ws-1', slug: 'test-board' };
+      const input = { workspaceSlug: 'my-workspace', boardSlug: 'test-board' };
       let receivedUrl = '';
 
       globalThis.fetch = async (url) => {
@@ -329,8 +374,7 @@ describe('board tools', () => {
 
       const result = await boardGetBySlugTool.handler(client, input);
 
-      expect(receivedUrl).toContain('workspacePublicId=ws-1');
-      expect(receivedUrl).toContain('slug=test-board');
+      expect(receivedUrl).toContain('/workspaces/my-workspace/boards/test-board');
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data).toEqual(mockBoard);
@@ -339,7 +383,7 @@ describe('board tools', () => {
 
     test('passes dueDateFilters to API', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const input = { workspacePublicId: 'ws-1', slug: 'test-board', dueDateFilters: ['overdue'] };
+      const input = { workspaceSlug: 'my-workspace', boardSlug: 'test-board', dueDateFilters: ['overdue'] };
       let receivedUrl = '';
 
       globalThis.fetch = async (url) => {
@@ -353,7 +397,7 @@ describe('board tools', () => {
 
     test('passes members filter to API', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const input = { workspacePublicId: 'ws-1', slug: 'test-board', members: ['user-1'] };
+      const input = { workspaceSlug: 'my-workspace', boardSlug: 'test-board', members: ['user-1'] };
       let receivedUrl = '';
 
       globalThis.fetch = async (url) => {
@@ -365,25 +409,25 @@ describe('board tools', () => {
       expect(decodeURIComponent(receivedUrl)).toContain('members=user-1');
     });
 
-    test('returns error when workspacePublicId is missing', async () => {
+    test('returns error when workspaceSlug is missing', async () => {
       const client = new KanClient(TEST_API_KEY);
 
-      const result = await boardGetBySlugTool.handler(client, { slug: 'test' } as any);
+      const result = await boardGetBySlugTool.handler(client, { boardSlug: 'test' } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('workspacePublicId');
+        expect(result.error).toContain('workspaceSlug');
       }
     });
 
-    test('returns error when slug is missing', async () => {
+    test('returns error when boardSlug is missing', async () => {
       const client = new KanClient(TEST_API_KEY);
 
-      const result = await boardGetBySlugTool.handler(client, { workspacePublicId: 'ws-1' } as any);
+      const result = await boardGetBySlugTool.handler(client, { workspaceSlug: 'my-workspace' } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('slug');
+        expect(result.error).toContain('boardSlug');
       }
     });
   });
@@ -408,7 +452,7 @@ describe('board tools', () => {
 
       const result = await boardUpdateTool.handler(client, input);
 
-      expect(receivedMethod).toBe('PATCH');
+      expect(receivedMethod).toBe('PUT');
       expect(receivedUrl).toContain('/boards/board-1');
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -438,6 +482,23 @@ describe('board tools', () => {
       if (result.ok) {
         expect(result.data.visibility).toBe('private');
       }
+    });
+
+    test('updates board slug, favorite and archived state', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const input = { publicId: 'board-1', slug: 'new-slug', favorite: true, isArchived: false };
+
+      let receivedBody = '';
+
+      globalThis.fetch = async (url, init) => {
+        receivedBody = init?.body as string;
+        return new Response(JSON.stringify(mockBoard), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await boardUpdateTool.handler(client, input);
+
+      expect(JSON.parse(receivedBody)).toEqual({ slug: 'new-slug', favorite: true, isArchived: false });
+      expect(result.ok).toBe(true);
     });
 
     test('returns error when publicId is missing', async () => {
@@ -492,10 +553,10 @@ describe('board tools', () => {
   });
 
   describe('board.checkSlugAvailability', () => {
-    test('returns availability status', async () => {
+    test('returns available when slug is not reserved', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const input = { workspacePublicId: 'ws-1', slug: 'my-board' };
-      const mockResponse = { available: true };
+      const input = { boardPublicId: 'board-1', boardSlug: 'my-board' };
+      const mockResponse = { isReserved: false };
       let receivedUrl = '';
 
       globalThis.fetch = async (url) => {
@@ -508,18 +569,18 @@ describe('board tools', () => {
 
       const result = await boardCheckSlugAvailabilityTool.handler(client, input);
 
-      expect(receivedUrl).toContain('workspacePublicId=ws-1');
-      expect(receivedUrl).toContain('slug=my-board');
+      expect(receivedUrl).toContain('/boards/board-1/check-slug-availability');
+      expect(receivedUrl).toContain('boardSlug=my-board');
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.available).toBe(true);
       }
     });
 
-    test('returns unavailable status', async () => {
+    test('returns unavailable when slug is reserved', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const input = { workspacePublicId: 'ws-1', slug: 'taken-board' };
-      const mockResponse = { available: false };
+      const input = { boardPublicId: 'board-1', boardSlug: 'taken-board' };
+      const mockResponse = { isReserved: true };
 
       globalThis.fetch = async () =>
         new Response(JSON.stringify(mockResponse), {
@@ -535,35 +596,36 @@ describe('board tools', () => {
       }
     });
 
-    test('returns error when workspacePublicId is missing', async () => {
+    test('returns error when boardPublicId is missing', async () => {
       const client = new KanClient(TEST_API_KEY);
 
-      const result = await boardCheckSlugAvailabilityTool.handler(client, { slug: 'test' } as any);
+      const result = await boardCheckSlugAvailabilityTool.handler(client, { boardSlug: 'test' } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('workspacePublicId');
+        expect(result.error).toContain('boardPublicId');
       }
     });
 
-    test('returns error when slug is missing', async () => {
+    test('returns error when boardSlug is missing', async () => {
       const client = new KanClient(TEST_API_KEY);
 
       const result = await boardCheckSlugAvailabilityTool.handler(client, {
-        workspacePublicId: 'ws-1',
+        boardPublicId: 'board-1',
       } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('slug');
+        expect(result.error).toContain('boardSlug');
       }
     });
   });
+
   describe('board.findByName', () => {
     test('finds board by workspace and board name', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const mockWorkspaces: Workspace[] = [
-        { publicId: 'ws-1', name: 'Project Alpha', slug: 'project-alpha', description: 'Test workspace', showEmailsToMembers: false, weekStartDay: 'monday', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+      const mockWorkspaces = [
+        { role: 'admin', workspace: { publicId: 'ws-1', name: 'Project Alpha', slug: 'project-alpha', description: 'Test workspace', showEmailsToMembers: false, weekStartDay: 1 } },
       ];
       const mockBoards: Board[] = [
         { publicId: 'board-1', workspacePublicId: 'ws-1', name: 'Sprint 1', slug: 'sprint-1', visibility: 'public', type: 'regular', isArchived: false, favorite: false, createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
@@ -582,7 +644,7 @@ describe('board tools', () => {
       if (result.ok) {
         expect(result.data.publicId).toBe('board-1');
       }
-      expect(boardsUrl).toContain('workspacePublicId=ws-1');
+      expect(boardsUrl).toContain('/workspaces/ws-1/boards');
     });
 
     test('returns error when workspace not found', async () => {
@@ -600,8 +662,8 @@ describe('board tools', () => {
 
     test('returns error when board not found', async () => {
       const client = new KanClient(TEST_API_KEY);
-      const mockWorkspaces: Workspace[] = [
-        { publicId: 'ws-1', name: 'Project Alpha', slug: 'project-alpha', description: 'Test workspace', showEmailsToMembers: false, weekStartDay: 'monday', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+      const mockWorkspaces = [
+        { role: 'admin', workspace: { publicId: 'ws-1', name: 'Project Alpha', slug: 'project-alpha', description: 'Test workspace', showEmailsToMembers: false, weekStartDay: 1 } },
       ];
 
       globalThis.fetch = async (url) => {
