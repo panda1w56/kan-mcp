@@ -1,10 +1,10 @@
 {
-  "name": "kan-mcp",
+  "name": "kanbn-mcp",
   "version": "0.1.7",
   "description": "MCP server for Kan.bn API - exposes 40 tools for workspace, board, list, card, label, checklist, and comment management",
   "main": "dist/index.js",
   "bin": {
-    "kan-mcp": "dist/index.js"
+    "kanbn-mcp": "dist/index.js"
   },
   "files": [
     "dist"
@@ -20,7 +20,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/michaelruelas/kan-mcp"
+    "url": "https://github.com/panda1w56/kan-mcp"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

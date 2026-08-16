@@ -48,7 +48,7 @@ npm publish --access public
 
 After publishing, users can install with:
 ```bash
-npx kan-mcp
+npx kanbn-mcp
 ```
 
 ## Configuration
@@ -71,13 +71,13 @@ export KAN_API_BASE_URL=https://kan.tools.pugcasa.com/api/v1
 Install once with npx (no cloning required):
 
 ```bash
-npx kan-mcp
+npx kanbn-mcp
 ```
 
 Or install globally:
 
 ```bash
-npm install -g kan-mcp
+npm install -g kanbn-mcp
 ```
 
 ## MCP Server Configuration
@@ -91,7 +91,7 @@ Add this to your agent/IDE's MCP server configuration:
   "mcpServers": {
     "kan": {
       "command": "npx",
-      "args": ["-y", "kan-mcp"],
+      "args": ["-y", "kanbn-mcp"],
       "env": {
         "KAN_API_KEY": "kan_your_api_key_here"
       }
