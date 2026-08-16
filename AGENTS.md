@@ -357,6 +357,39 @@ tests/
 
 ---
 
+## Release / Publishing
+
+Publishing to npm is handled automatically by the GitHub Actions workflow in
+`.github/workflows/publish.yml`. It triggers on version tags (`v*`) or manual
+dispatch, runs `npm test` and `npm run build`, then runs `npm publish`.
+
+### Requirements
+
+- The `NPM_TOKEN` secret must be configured in the GitHub repository settings
+  (Settings → Secrets and variables → Actions). Use a granular access token with
+  **read & write** on the `kanbn-mcp` package and **Bypass 2FA** enabled.
+- The package is published as `kanbn-mcp` (unscoped, public).
+
+### How to publish a new version
+
+1. Bump the version in `package.json` (e.g. `0.1.7` → `0.1.8`).
+2. Commit the change:
+   ```bash
+   git add package.json package-lock.json
+   git commit -m "Bump version to 0.1.8"
+   ```
+3. Tag the release and push:
+   ```bash
+   git tag v0.1.8
+   git push origin main --tags
+   ```
+4. The workflow runs tests, builds, and publishes automatically.
+
+To publish manually without a tag, trigger the workflow from the Actions tab
+(Workflow dispatch).
+
+---
+
 ## Future Improvements
 
 - Consider adding ESLint with TypeScript rules for consistent code style
