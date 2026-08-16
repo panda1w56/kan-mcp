@@ -112,6 +112,15 @@ export interface ChecklistItem {
   updatedAt: string;
 }
 
+export interface Comment {
+  publicId: CommentId;
+  cardPublicId: string;
+  memberPublicId: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Stats {
   users: number;
   workspaces: number;

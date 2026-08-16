@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { KanClient } from '../../src/client';
 import { Checklist, ChecklistItem } from '../../src/types';
 import {

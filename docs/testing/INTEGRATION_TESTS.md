@@ -3,7 +3,7 @@
 This document describes how to run integration tests against the real Kan.bn API.
 
 > **Note for agents/IDEs:** Environment variables can typically be set via:
-> - CLI: `INTEGRATION_TEST=true KAN_API_KEY=your_key bun test tests/integration`
+> - CLI: `INTEGRATION_TEST=true KAN_API_KEY=your_key npm run test:integration`
 > - MCP config: Add to `env` section of your MCP server configuration
 > - IDE: Check your IDE's environment variable settings
 
@@ -22,7 +22,7 @@ KAN_API_BASE_URL=https://kan.bn/api/v1  # Optional, defaults to kan.bn
 
 3. Run integration tests:
 ```bash
-INTEGRATION_TEST=true bun test tests/integration
+INTEGRATION_TEST=true npm run test:integration
 ```
 
 ## Test Environments
@@ -166,5 +166,5 @@ If tests fail, check:
 
 Run with verbose output:
 ```bash
-INTEGRATION_TEST=true bun test tests/integration --reporter=verbose
+INTEGRATION_TEST=true npx vitest run tests/integration --reporter=verbose
 ```

@@ -4,7 +4,7 @@
 
 kan-mcp is a Model Context Protocol (MCP) server for the Kan.bn API. It exposes 40 tools across 7 domains: workspace, board, list, card, label, checklist, and comment.
 
-**Technology Stack:** Bun runtime, TypeScript (strict mode), @modelcontextprotocol/sdk
+**Technology Stack:** Node.js runtime, TypeScript (strict mode), @modelcontextprotocol/sdk
 
 ---
 
@@ -12,22 +12,22 @@ kan-mcp is a Model Context Protocol (MCP) server for the Kan.bn API. It exposes 
 
 ```bash
 # Install dependencies
-bun install
+npm install
 
 # Build for distribution (creates standalone binary ./kan-mcp)
-bun run build
+npm run build
 
 # Run all unit tests
-bun test
+npm test
 
 # Run a specific test file
-bun test tests/tools/workspace.test.ts
+npx vitest run tests/tools/workspace.test.ts
 
 # Run tests matching a pattern (using grep)
-bun test tests/integration
+npm run test:integration
 
 # Run integration tests (requires KAN_API_KEY environment variable)
-INTEGRATION_TEST=true bun test tests/integration
+INTEGRATION_TEST=true npm run test:integration
 ```
 
 ### Environment Variables
@@ -47,7 +47,7 @@ The project uses strict TypeScript with additional checks. Key settings in `tsco
 - `noUncheckedIndexedAccess: true` - Arrays/objects return undefined possibility
 - `exactOptionalPropertyTypes: true` - Distinguish between unset and undefined
 - `noImplicitOverride: true` - Require `override` keyword on overridden methods
-- `moduleResolution: bundler` - For ESM with Bun
+- `moduleResolution: NodeNext` - For ESM with Node
 
 ---
 
@@ -269,10 +269,10 @@ export const workspaceCreateTool: Tool<WorkspaceCreateInput, Workspace> = {
 
 ### Test Structure
 
-Tests use Bun's test framework with `describe`, `test`, `expect`, `beforeEach`, `afterEach`.
+Tests use Vitest with `describe`, `test`, `expect`, `beforeEach`, `afterEach`.
 
 ```typescript
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 
 describe('workspace tools', () => {
   let originalFetch: typeof fetch;

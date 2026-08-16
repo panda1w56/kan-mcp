@@ -1,4 +1,4 @@
-import type { ToolResult } from './types';
+import type { ToolResult } from './types.js';
 
 export function isSuccess<T>(result: ToolResult<T>): result is { ok: true; data: T } {
   return result.ok === true;

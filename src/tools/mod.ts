@@ -1,45 +1,48 @@
-import type { Tool } from './workspace';
+import type { Tool } from './workspace.js';
 import {
   workspaceListTool,
   workspaceCreateTool,
   workspaceGetByIdTool,
   workspaceGetBySlugTool,
+  workspaceFindByNameTool,
   workspaceUpdateTool,
   workspaceDeleteTool,
   workspaceSearchTool,
   workspaceCheckSlugAvailabilityTool,
-} from './workspace';
+} from './workspace.js';
 import {
   boardListTool,
   boardCreateTool,
+  boardFindByNameTool,
   boardGetByIdTool,
   boardGetBySlugTool,
   boardUpdateTool,
   boardDeleteTool,
   boardCheckSlugAvailabilityTool,
-} from './board';
+} from './board.js';
 import {
   listCreateTool,
   listUpdateTool,
   listDeleteTool,
-} from './list';
+} from './list.js';
 import {
   cardCreateTool,
   cardGetByIdTool,
   cardUpdateTool,
   cardDeleteTool,
+  cardDuplicateTool,
   cardAddLabelTool,
   cardRemoveLabelTool,
   cardAddMemberTool,
   cardRemoveMemberTool,
   cardListActivitiesTool,
-} from './card';
+} from './card.js';
 import {
   labelCreateTool,
   labelGetByIdTool,
   labelUpdateTool,
   labelDeleteTool,
-} from './label';
+} from './label.js';
 import {
   checklistCreateTool,
   checklistUpdateTool,
@@ -47,13 +50,13 @@ import {
   checklistAddItemTool,
   checklistUpdateItemTool,
   checklistDeleteItemTool,
-} from './checklist';
+} from './checklist.js';
 import {
   commentAddTool,
   commentUpdateTool,
   commentDeleteTool,
-} from './comment';
-import { serverHealthTool } from './server';
+} from './comment.js';
+import { serverHealthTool } from './server.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const tools: any[] = [
@@ -61,12 +64,14 @@ export const tools: any[] = [
   workspaceCreateTool,
   workspaceGetByIdTool,
   workspaceGetBySlugTool,
+  workspaceFindByNameTool,
   workspaceUpdateTool,
   workspaceDeleteTool,
   workspaceSearchTool,
   workspaceCheckSlugAvailabilityTool,
   boardListTool,
   boardCreateTool,
+  boardFindByNameTool,
   boardGetByIdTool,
   boardGetBySlugTool,
   boardUpdateTool,
@@ -79,6 +84,7 @@ export const tools: any[] = [
   cardGetByIdTool,
   cardUpdateTool,
   cardDeleteTool,
+  cardDuplicateTool,
   cardAddLabelTool,
   cardRemoveLabelTool,
   cardAddMemberTool,
@@ -100,4 +106,4 @@ export const tools: any[] = [
   serverHealthTool,
 ];
 
-export type { Tool } from './workspace';
+export type { Tool } from './workspace.js';

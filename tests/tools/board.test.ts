@@ -1,6 +1,6 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { KanClient } from '../../src/client';
-import { Board, ToolResult } from '../../src/types';
+import { Board, ToolResult, Workspace } from '../../src/types';
 import {
   boardListTool,
   boardCreateTool,
@@ -8,6 +8,7 @@ import {
   boardGetBySlugTool,
   boardUpdateTool,
   boardDeleteTool,
+  boardFindByNameTool,
   boardCheckSlugAvailabilityTool,
 } from '../../src/tools/board';
 
@@ -558,4 +559,63 @@ describe('board tools', () => {
       }
     });
   });
+  describe('board.findByName', () => {
+    test('finds board by workspace and board name', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const mockWorkspaces: Workspace[] = [
+        { publicId: 'ws-1', name: 'Project Alpha', slug: 'project-alpha', description: 'Test workspace', showEmailsToMembers: false, weekStartDay: 'monday', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+      ];
+      const mockBoards: Board[] = [
+        { publicId: 'board-1', workspacePublicId: 'ws-1', name: 'Sprint 1', slug: 'sprint-1', visibility: 'public', type: 'regular', isArchived: false, favorite: false, createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+      ];
+
+      let boardsUrl = '';
+      globalThis.fetch = async (url) => {
+        if (String(url).includes('/boards')) boardsUrl = String(url);
+        const payload = String(url).includes('/boards') ? mockBoards : mockWorkspaces;
+        return new Response(JSON.stringify(payload), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await boardFindByNameTool.handler(client, { workspaceName: 'project alpha', boardName: 'sprint 1' });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.publicId).toBe('board-1');
+      }
+      expect(boardsUrl).toContain('workspacePublicId=ws-1');
+    });
+
+    test('returns error when workspace not found', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      globalThis.fetch = async () =>
+        new Response(JSON.stringify([]), { status: 200, ok: true }) as Response;
+
+      const result = await boardFindByNameTool.handler(client, { workspaceName: 'missing', boardName: 'anything' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('No workspace found');
+      }
+    });
+
+    test('returns error when board not found', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const mockWorkspaces: Workspace[] = [
+        { publicId: 'ws-1', name: 'Project Alpha', slug: 'project-alpha', description: 'Test workspace', showEmailsToMembers: false, weekStartDay: 'monday', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+      ];
+
+      globalThis.fetch = async (url) => {
+        const payload = String(url).includes('/boards') ? [] : mockWorkspaces;
+        return new Response(JSON.stringify(payload), { status: 200, ok: true }) as Response;
+      };
+
+      const result = await boardFindByNameTool.handler(client, { workspaceName: 'Project Alpha', boardName: 'missing' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('No board found');
+      }
+    });
+  });
+
 });

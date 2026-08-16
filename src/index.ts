@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, ListResourcesRequestSchema, ReadResourceRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -70,31 +70,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   } catch (error) {
     return { content: [{ type: "text", text: toMcpError(error).message }], isError: true };
-  }
-});
-
-server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-  resources: resourceList.map(r => ({
-    uri: r.uri,
-    name: r.name,
-    description: r.description,
-    mimeType: r.mimeType,
-  })),
-}));
-
-server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-  const { uri } = request.params;
-  try {
-    return await handleResource(uri, client);
-  } catch (error) {
-    return {
-      contents: [{
-        uri,
-        mimeType: 'application/json',
-        text: JSON.stringify({ error: toMcpError(error).message }),
-      }],
-      isError: true,
-    };
   }
 });
 

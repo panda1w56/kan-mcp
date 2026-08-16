@@ -1,7 +1,7 @@
-import { KanClient } from '../client';
-import { Checklist, ChecklistItem, ToolResult, ROUTES } from '../types';
-import { success, error, assertString, assertOptionalString, assertBoolean } from '../utils';
-import { toMcpError } from '../errors';
+import { KanClient } from '../client.js';
+import { Checklist, ChecklistItem, ToolResult, ROUTES } from '../types.js';
+import { success, error, assertString, assertOptionalString, assertBoolean } from '../utils.js';
+import { toMcpError } from '../errors.js';
 
 interface Tool<TInput = unknown, TOutput = unknown> {
   name: string;

@@ -2,10 +2,10 @@
 
 A Model Context Protocol (MCP) server that exposes the [Kan.bn](https://kan.bn) REST API as tools for AI assistants.
 
-Built with Bun + TypeScript.
+Built with Node.js + TypeScript.
 
 ![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
-![Bun](https://img.shields.io/badge/Bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white)
+![Node](https://img.shields.io/badge/Node.js-%23339933.svg?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Test Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen?style=for-the-badge)
 
 ## Overview
@@ -27,13 +27,13 @@ kan-mcp exposes 40 tools across 7 domains for managing Kan.bn workspaces, plus M
 
 ```bash
 # Install (for development)
-bun install
+npm install
 
 # Run tests
-bun test
+npm test
 
 # Build for distribution
-bun run build
+npm run build
 ```
 
 ## Publishing
@@ -43,12 +43,12 @@ bun run build
 npm login
 
 # Publish to npm
-bun publish --access public
+npm publish --access public
 ```
 
 After publishing, users can install with:
 ```bash
-bunx kan-mcp
+npx kan-mcp
 ```
 
 ## Configuration
@@ -57,7 +57,7 @@ kan-mcp requires a Kan.bn API key:
 
 ```bash
 export KAN_API_KEY=your_api_key_here
-bun run src/index.ts
+npm run build && node dist/index.js
 ```
 
 Optional: Set a custom API base URL:
@@ -68,16 +68,16 @@ export KAN_API_BASE_URL=https://kan.tools.pugcasa.com/api/v1
 
 ## Installation
 
-Install once with bunx (no cloning required):
+Install once with npx (no cloning required):
 
 ```bash
-bunx kan-mcp
+npx kan-mcp
 ```
 
 Or install globally:
 
 ```bash
-bun add -g kan-mcp
+npm install -g kan-mcp
 ```
 
 ## MCP Server Configuration
@@ -90,8 +90,8 @@ Add this to your agent/IDE's MCP server configuration:
 {
   "mcpServers": {
     "kan": {
-      "command": "bunx",
-      "args": ["kan-mcp"],
+      "command": "npx",
+      "args": ["-y", "kan-mcp"],
       "env": {
         "KAN_API_KEY": "kan_your_api_key_here"
       }
@@ -116,6 +116,7 @@ Add this to your agent/IDE's MCP server configuration:
 
 ```
 workspace.list                    # List all workspaces
+workspace.findByName              # Find workspace by name (case-insensitive)
 workspace.create                  # Create a new workspace
 workspace.getById                 # Get workspace by ID
 workspace.getBySlug              # Get workspace by slug
@@ -132,6 +133,7 @@ board.list                       # List boards (with filters)
 board.create                     # Create a new board
 board.getById                    # Get board by ID (with card filters)
 board.getBySlug                  # Get board by slug (with card filters)
+board.findByName                 # Find board by workspace + board name
 board.update                     # Update board properties
 board.delete                     # Delete a board
 board.checkSlugAvailability      # Check if slug is available
@@ -161,6 +163,7 @@ list.delete                      # Delete a list
 ```
 card.create                      # Create a new card
 card.getById                     # Get card by ID
+card.duplicate                  # Duplicate a card to same or different list
 card.update                      # Update card properties
 card.delete                      # Delete a card
 card.addLabel                    # Add label to card

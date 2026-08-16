@@ -2,10 +2,13 @@
   "name": "kan-mcp",
   "version": "0.1.7",
   "description": "MCP server for Kan.bn API - exposes 40 tools for workspace, board, list, card, label, checklist, and comment management",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
   "bin": {
-    "kan-mcp": "src/index.ts"
+    "kan-mcp": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "keywords": [
     "mcp",
@@ -20,15 +23,19 @@
     "url": "https://github.com/michaelruelas/kan-mcp"
   },
   "scripts": {
-    "build": "bun build src/index.ts --compile --outfile kan-mcp",
-    "test": "bun test",
-    "test:integration": "INTEGRATION_TEST=true bun test tests/integration"
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "INTEGRATION_TEST=true vitest run tests/integration"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^16.4.5"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
   }
 }

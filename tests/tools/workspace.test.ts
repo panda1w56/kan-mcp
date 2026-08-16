@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { KanClient } from '../../src/client';
 import { Workspace, ToolResult } from '../../src/types';
 import {
@@ -9,6 +9,7 @@ import {
   workspaceUpdateTool,
   workspaceDeleteTool,
   workspaceSearchTool,
+  workspaceFindByNameTool,
   workspaceCheckSlugAvailabilityTool,
 } from '../../src/tools/workspace';
 
@@ -391,4 +392,46 @@ describe('workspace tools', () => {
       }
     });
   });
+  describe('workspace.findByName', () => {
+    test('finds workspace by name (case-insensitive)', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      const mockWorkspaces: Workspace[] = [
+        { publicId: 'ws-1', name: 'Project Alpha', slug: 'project-alpha', description: 'Test workspace', showEmailsToMembers: false, weekStartDay: 'monday', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+      ];
+
+      globalThis.fetch = async () =>
+        new Response(JSON.stringify(mockWorkspaces), { status: 200, ok: true }) as Response;
+
+      const result = await workspaceFindByNameTool.handler(client, { name: 'project alpha' });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.publicId).toBe('ws-1');
+      }
+    });
+
+    test('returns error when workspace not found', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      globalThis.fetch = async () =>
+        new Response(JSON.stringify([]), { status: 200, ok: true }) as Response;
+
+      const result = await workspaceFindByNameTool.handler(client, { name: 'nonexistent' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('No workspace found');
+      }
+    });
+
+    test('returns error on API failure', async () => {
+      const client = new KanClient(TEST_API_KEY, undefined, 5000, 0);
+      globalThis.fetch = async () =>
+        new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401, ok: false }) as Response;
+
+      const result = await workspaceFindByNameTool.handler(client, { name: 'test' });
+
+      expect(result.ok).toBe(false);
+    });
+  });
+
 });

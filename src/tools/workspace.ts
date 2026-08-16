@@ -1,8 +1,8 @@
-import { KanClient } from '../client';
-import { Workspace, ToolResult, Board, Card } from '../types';
-import { success, error, assertString, assertOptionalString } from '../utils';
-import { toMcpError } from '../errors';
-import { ROUTES } from '../types';
+import { KanClient } from '../client.js';
+import { Workspace, ToolResult, Board, Card } from '../types.js';
+import { success, error, assertString, assertOptionalString } from '../utils.js';
+import { toMcpError } from '../errors.js';
+import { ROUTES } from '../types.js';
 
 export interface Tool<TInput = unknown, TOutput = unknown> {
   name: string;
@@ -45,6 +45,11 @@ interface WorkspaceUpdateInput {
 interface WorkspaceDeleteInput {
   publicId: string;
 }
+
+interface WorkspaceFindByNameInput {
+  name: string;
+}
+
 
 interface WorkspaceSearchInput {
   query: string;
@@ -158,6 +163,32 @@ export const workspaceGetBySlugTool: Tool<WorkspaceGetBySlugInput, Workspace> = 
     }
   },
 };
+
+export const workspaceFindByNameTool: Tool<WorkspaceFindByNameInput, Workspace> = {
+  name: 'workspace.findByName',
+  description: 'Find a workspace by its name (case-insensitive)',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+    },
+    required: ['name'],
+  },
+  handler: async (client: KanClient, input: WorkspaceFindByNameInput): Promise<ToolResult<Workspace>> => {
+    try {
+      assertString(input.name, 'name');
+      const workspaces = await client.request<Workspace[]>(ROUTES.WORKSPACES);
+      const match = workspaces.find((w) => w.name.toLowerCase() === input.name.toLowerCase());
+      if (!match) {
+        return error(`No workspace found with name "${input.name}"`);
+      }
+      return success(match);
+    } catch (err) {
+      return error(toMcpError(err).message);
+    }
+  },
+};
+
 
 export const workspaceUpdateTool: Tool<WorkspaceUpdateInput, Workspace> = {
   name: 'workspace.update',

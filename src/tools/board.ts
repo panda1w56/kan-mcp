@@ -1,7 +1,7 @@
-import { KanClient } from '../client';
-import { Board, Visibility, ToolResult, ROUTES } from '../types';
-import { success, error, assertString, assertOptionalString } from '../utils';
-import { toMcpError } from '../errors';
+import { KanClient } from '../client.js';
+import { Board, Visibility, ToolResult, ROUTES, Workspace } from '../types.js';
+import { success, error, assertString, assertOptionalString } from '../utils.js';
+import { toMcpError } from '../errors.js';
 
 interface Tool<TInput = unknown, TOutput = unknown> {
   name: string;
@@ -55,6 +55,12 @@ interface BoardDeleteInput {
   publicId: string;
 }
 
+interface BoardFindByNameInput {
+  workspaceName: string;
+  boardName: string;
+}
+
+
 interface BoardCheckSlugInput {
   workspacePublicId: string;
   slug: string;
@@ -88,6 +94,40 @@ export const boardListTool: Tool<BoardListInput, Board[]> = {
     }
   },
 };
+
+export const boardFindByNameTool: Tool<BoardFindByNameInput, Board> = {
+  name: 'board.findByName',
+  description: 'Find a board by workspace name and board name (both case-insensitive)',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      workspaceName: { type: 'string' },
+      boardName: { type: 'string' },
+    },
+    required: ['workspaceName', 'boardName'],
+  },
+  handler: async (client: KanClient, input: BoardFindByNameInput): Promise<ToolResult<Board>> => {
+    try {
+      assertString(input.workspaceName, 'workspaceName');
+      assertString(input.boardName, 'boardName');
+      const workspaces = await client.request<Workspace[]>(ROUTES.WORKSPACES);
+      const workspace = workspaces.find((w) => w.name.toLowerCase() === input.workspaceName.toLowerCase());
+      if (!workspace) {
+        return error(`No workspace found with name "${input.workspaceName}"`);
+      }
+      const queryParams = new URLSearchParams({ workspacePublicId: workspace.publicId });
+      const boards = await client.request<Board[]>(`${ROUTES.BOARDS}?${queryParams}`);
+      const board = boards.find((b) => b.name.toLowerCase() === input.boardName.toLowerCase());
+      if (!board) {
+        return error(`No board found with name "${input.boardName}" in workspace "${input.workspaceName}"`);
+      }
+      return success(board);
+    } catch (err) {
+      return error(toMcpError(err).message);
+    }
+  },
+};
+
 
 export const boardCreateTool: Tool<BoardCreateInput, Board> = {
   name: 'board.create',

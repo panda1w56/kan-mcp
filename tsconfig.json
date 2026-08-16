@@ -5,11 +5,16 @@
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "lib": ["ES2022", "DOM"],
     "skipLibCheck": true,
-    "types": ["bun-types"]
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
   "include": ["src/**/*"]
 }

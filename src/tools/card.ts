@@ -1,7 +1,7 @@
-import { KanClient } from '../client';
-import { Card, ToolResult, ROUTES, ActivityPage } from '../types';
-import { success, error, assertString, assertOptionalString, assertNumber, sanitizeHtml } from '../utils';
-import { toMcpError } from '../errors';
+import { KanClient } from '../client.js';
+import { Card, ToolResult, ROUTES, ActivityPage } from '../types.js';
+import { success, error, assertString, assertOptionalString, assertNumber, sanitizeHtml } from '../utils.js';
+import { toMcpError } from '../errors.js';
 
 interface Tool<TInput = unknown, TOutput = unknown> {
   name: string;
@@ -77,6 +77,11 @@ interface CardUpdateInput {
 
 interface CardDeleteInput {
   publicId: string;
+}
+
+interface CardDuplicateInput {
+  cardPublicId: string;
+  targetListPublicId?: string;
 }
 
 interface CardAddLabelInput {
@@ -182,6 +187,34 @@ export const cardDeleteTool: Tool<CardDeleteInput, { success: boolean }> = {
         method: 'DELETE',
       });
       return success({ success: true });
+    } catch (err) {
+      return error(toMcpError(err).message);
+    }
+  },
+};
+
+export const cardDuplicateTool: Tool<CardDuplicateInput, Card> = {
+  name: 'card.duplicate',
+  description: 'Duplicate a card to the same or a different list',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      cardPublicId: { type: 'string' },
+      targetListPublicId: { type: 'string' },
+    },
+    required: ['cardPublicId'],
+  },
+  handler: async (client: KanClient, input: CardDuplicateInput): Promise<ToolResult<Card>> => {
+    try {
+      assertString(input.cardPublicId, 'cardPublicId');
+      assertOptionalString(input.targetListPublicId, 'targetListPublicId');
+      const body: Record<string, unknown> = {};
+      if (input.targetListPublicId !== undefined) body.targetListPublicId = input.targetListPublicId;
+      const data = await client.request<Card>(`${ROUTES.CARDS}/${input.cardPublicId}/duplicate`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      return success(data);
     } catch (err) {
       return error(toMcpError(err).message);
     }

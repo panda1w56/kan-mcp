@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { KanClient } from '../../src/client';
 import { Card } from '../../src/types';
 import {
@@ -10,6 +10,7 @@ import {
   cardRemoveLabelTool,
   cardAddMemberTool,
   cardRemoveMemberTool,
+  cardDuplicateTool,
   cardListActivitiesTool,
 } from '../../src/tools/card';
 
@@ -652,4 +653,55 @@ describe('card tools', () => {
       }
     });
   });
+  describe('card.duplicate', () => {
+    test('duplicates a card', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      let receivedUrl = '';
+      let receivedMethod = '';
+      let receivedBody = '';
+
+      globalThis.fetch = async (url, init) => {
+        receivedUrl = url as string;
+        receivedMethod = init?.method ?? 'GET';
+        receivedBody = init?.body as string;
+        return new Response(JSON.stringify(mockCard), { status: 201, ok: true }) as Response;
+      };
+
+      const result = await cardDuplicateTool.handler(client, { cardPublicId: 'card-1' });
+
+      expect(receivedMethod).toBe('POST');
+      expect(receivedUrl).toContain('/cards/card-1/duplicate');
+      expect(JSON.parse(receivedBody)).toEqual({});
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.publicId).toBe('card-1');
+      }
+    });
+
+    test('duplicates a card to a different list', async () => {
+      const client = new KanClient(TEST_API_KEY);
+      let receivedBody = '';
+
+      globalThis.fetch = async (url, init) => {
+        receivedBody = init?.body as string;
+        return new Response(JSON.stringify(mockCard), { status: 201, ok: true }) as Response;
+      };
+
+      const result = await cardDuplicateTool.handler(client, { cardPublicId: 'card-1', targetListPublicId: 'list-2' });
+
+      expect(JSON.parse(receivedBody)).toEqual({ targetListPublicId: 'list-2' });
+      expect(result.ok).toBe(true);
+    });
+
+    test('returns error on API failure', async () => {
+      const client = new KanClient(TEST_API_KEY, undefined, 5000, 0);
+      globalThis.fetch = async () =>
+        new Response(JSON.stringify({ message: 'Bad Request' }), { status: 400, ok: false }) as Response;
+
+      const result = await cardDuplicateTool.handler(client, { cardPublicId: 'card-1' });
+
+      expect(result.ok).toBe(false);
+    });
+  });
+
 });

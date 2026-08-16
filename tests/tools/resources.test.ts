@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { KanClient } from '../../src/client.js';
 import { resourceList, handleResource } from '../../src/tools/resources.js';
 
@@ -59,7 +59,7 @@ describe('resources', () => {
       globalThis.fetch = async () =>
         new Response(JSON.stringify({}), { status: 200, ok: true }) as Response;
 
-      expect(() => handleResource('kan://unknown', client)).toThrow('Unknown resource URI');
+      await expect(handleResource('kan://unknown', client)).rejects.toThrow('Unknown resource URI');
     });
   });
 
